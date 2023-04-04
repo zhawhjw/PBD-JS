@@ -4,6 +4,11 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
 import Stats from 'three/addons/libs/stats.module.js';
 
+import * as A from "agentConfiguration"
+// import {agentConfig} from "./positions";
+
+// console.log(A.agentConfig());
+
 class Tile {
 
     constructor( r, c, x, y, z, cost = 1) {
@@ -32,6 +37,7 @@ let world = {
     z: 100
 };
 let agentData = [];
+let wallData = [];
 // for ray to detect
 let pickableObjects = [];
 let pickableTiles = [];
@@ -49,7 +55,8 @@ let grid, ring;
 let rows, columns;
 let spotLights = {};
 let topTexture;
-const RADIUS = 1;
+const RADIUS = 0.4;
+const WORLDUNIT = 1;
 const blueAgentMaterial = new THREE.MeshLambertMaterial({
     color: 0x0000ff
 });
@@ -61,8 +68,8 @@ const stats = new Stats();
 document.body.appendChild(stats.dom)
 
 const tile = {
-    w:RADIUS * 2,
-    h:RADIUS * 2
+    w:WORLDUNIT * 2,
+    h:WORLDUNIT * 2
 }
 
 
@@ -87,8 +94,9 @@ const obstacles = [
     [20, 17],
     [20, 18],
     [20, 19],
-    [20, 20],
+    // [20, 20],
 
+    // [20, 22],
     [20, 23],
     [20, 24],
     [20, 25],
@@ -119,7 +127,6 @@ const obstacles = [
 
 
 ]
-
 
 
 
@@ -260,23 +267,23 @@ function Walkable(startTile, endTile){
 
 
 
-// Starting and ending coordinates of the ray
+    // Starting and ending coordinates of the ray
     const startCoord = new THREE.Vector3(startTile.x, startTile.y, startTile.z);
     const endCoord = new THREE.Vector3(endTile.x, endTile.y, endTile.z);
 
     const distance = startCoord.distanceTo(endCoord); // Maximum distance to check
 
     // const range = new THREE.Box3().setFromCenterAndSize(startCoord, boxSize);
-// Set the ray's position to the starting coordinate
+    // Set the ray's position to the starting coordinate
 
     ray.set(startCoord, endCoord.clone().sub(startCoord).normalize());
 
 
 
-// Check for intersection with objects in the scene
+    // Check for intersection with objects in the scene
     const intersects = ray.intersectObjects(pickableWall, false);
 
-// Filter the intersections to only include objects between the two coordinates
+    // Filter the intersections to only include objects between the two coordinates
     const filteredIntersects = intersects.filter((intersection) => {
         return intersection.distance <= distance && intersection.distance > 0
 
@@ -342,9 +349,9 @@ function gridization(){
         for (let j = 0; j < columns; j++) {
 
             const object_position = {
-                x: start_point.x + RADIUS + i * tile.w,
+                x: start_point.x + WORLDUNIT + i * tile.w,
                 y: 1,
-                z: start_point.z + RADIUS + j * tile.h,
+                z: start_point.z + WORLDUNIT + j * tile.h,
             };
 
             let cost;
@@ -367,7 +374,7 @@ function gridization(){
 
             let t = tiles[i][j];
 
-            const geometry = new THREE.BoxGeometry(tile.w, RADIUS * 2, tile.h);
+            const geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
 
             let material;
             if (t.cost >= 10){
@@ -408,6 +415,8 @@ function gridization(){
 
             if(t.cost >= 10){
                 pickableWall.push(cube);
+                wallData.push(cube.userData);
+
             }else {
                 pickableWalkingTiles.push(cube);
             }
@@ -553,10 +562,236 @@ function init() {
 
                 path : null,
                 path_index: 0,
+
+                simEnd:null,
+
+                correction: false,
+                collidewall : [[...obstacles].map(c => false)],
             });
             i += 1;
         }
     }
+
+
+    function defaultAgentConfiguration(){
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: 45
+            }, {
+                x: -35,
+                z: 45
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: 40
+            }, {
+                x: -35,
+                z: 40
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: 35
+            }, {
+                x: -35,
+                z: 35
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: 30
+            }, {
+                x: -35,
+                z: 30
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: 25
+            }, {
+                x: -35,
+                z: 25
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: 20
+            }, {
+                x: -35,
+                z: 20
+            },
+            0.8, "X", );
+
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: 15
+            }, {
+                x: -35,
+                z: 15
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: 10
+            }, {
+                x: -35,
+                z: 10
+            },
+            0.8, "X", );
+
+        // new agent
+        //
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: 5
+            }, {
+                x: -35,
+                z: 5
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: 0
+            }, {
+                x: -35,
+                z: 0
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -5
+            }, {
+                x: -35,
+                z: -5
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -10
+            }, {
+                x: -35,
+                z: -10
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -15
+            }, {
+                x: -35,
+                z: -15
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -20
+            }, {
+                x: -35,
+                z: -20
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -25
+            }, {
+                x: -35,
+                z: -25
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -30
+            }, {
+                x: -35,
+                z: -30
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -35
+            }, {
+                x: -35,
+                z: -35
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -40
+            }, {
+                x: -35,
+                z: -40
+            },
+            0.8, "X", );
+    }
+    // defaultAgentConfiguration();
+
+    function addOneAgents(agentData, id,
+                                 startPos, goalPos,
+                                 velocityMagnitude) {
+
+        let vx = 0,
+            vz = 0;
+        let distanceToGoal = PHY.distance(startPos.x, startPos.z,
+            goalPos.x, goalPos.z);
+        vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
+        vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
+
+
+        agentData.push({
+            index: id,
+            x: startPos.x,
+            y: 2.0,
+            z: startPos.z,
+            goal_x: goalPos.x,
+            goal_y: 0.0,
+            goal_z: goalPos.z,
+            vx: vx,
+            vy: 0.0,
+            vz: vz,
+            v_pref: Math.sqrt(vx * vx + vz * vz),
+            radius: RADIUS,
+            invmass: 0.5,
+            group_id: 1,
+
+            path : null,
+            path_index: 0,
+            correction: false,
+            collidewall : [[...obstacles].map(c => false)],
+        });
+
+    }
+
+    function loadFromAgentData(){
+        A.agentConfig().forEach(function(item, index){
+
+            addOneAgents(agentData, item.agent_id, {x:item.x, z:item.y}, {x:item.gx, z:item.gy}, 0.8);
+
+        });
+    }
+    loadFromAgentData();
+
 
 
     let i = 0;
@@ -569,176 +804,7 @@ function init() {
     world.distanceConstraints = [];
 
 
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 30,
-            z: 45
-        }, {
-            x: -35,
-            z: 45
-        },
-        0.8, "X", );
 
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 30,
-            z: 40
-        }, {
-            x: -35,
-            z: 40
-        },
-        0.8, "X", );
-
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 30,
-            z: 35
-        }, {
-            x: -35,
-            z: 35
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 30,
-            z: 30
-        }, {
-            x: -35,
-            z: 30
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 30,
-            z: 25
-        }, {
-            x: -35,
-            z: 25
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: 20
-        }, {
-            x: -35,
-            z: 20
-        },
-        0.8, "X", );
-
-
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: 15
-        }, {
-            x: -35,
-            z: 15
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: 10
-        }, {
-            x: -35,
-            z: 10
-        },
-        0.8, "X", );
-
-    // new agent
-    //
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: 5
-        }, {
-            x: -35,
-            z: 5
-        },
-        0.8, "X", );
-
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: 0
-        }, {
-            x: -35,
-            z: 0
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -5
-        }, {
-            x: -35,
-            z: -5
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -10
-        }, {
-            x: -35,
-            z: -10
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -15
-        }, {
-            x: -35,
-            z: -15
-        },
-        0.8, "X", );
-
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -20
-        }, {
-            x: -35,
-            z: -20
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -25
-        }, {
-            x: -35,
-            z: -25
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -30
-        }, {
-            x: -35,
-            z: -30
-        },
-        0.8, "X", );
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -35
-        }, {
-            x: -35,
-            z: -35
-        },
-        0.8, "X", );
-
-
-    addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-            x: 25,
-            z: -40
-        }, {
-            x: -35,
-            z: -40
-        },
-        0.8, "X", );
 
 
     let agentGeom, agentMaterial, agent;
@@ -747,7 +813,7 @@ function init() {
     agentData.forEach(function(item, index) {
 
 
-        agentGeom = new THREE.CylinderGeometry(item.radius, 1, 4, 16);
+        agentGeom = new THREE.CylinderGeometry(item.radius, item.radius, 4, 16);
         agentMaterial = new THREE.MeshLambertMaterial({
             color: 0x00ff00
         });
@@ -787,9 +853,33 @@ function init() {
     window.addEventListener("click", mouseDown, false);
     window.addEventListener("mousemove", mouseMove, false);
     window.addEventListener("contextmenu", rightClick, false);
-
+    document.getElementById('download-btn').addEventListener('click', downloadSimData, false);
 
 }
+
+
+const global_frames = []; // An array to hold the frame data
+let global_frame_pointer = 0;
+
+// Handle the button click event
+function downloadSimData() {
+    const frameNumber = parseInt(document.getElementById('frame').value);
+
+    if (global_frames.length > 0) {
+        // Convert the frames array to JSON
+        const json = JSON.stringify(global_frames);
+
+        // Download the JSON file
+        const link = document.createElement('a');
+        link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
+        link.setAttribute('download', `simulation_${frameNumber}.json`);
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
 
 function convertWorld2Grid(world_position){
 
@@ -827,7 +917,7 @@ function mouseMove(event) {
     if (event.code === 'Enter') {
         var mouseX = event.clientX;
         var mouseY = event.clientY;
-        console.log('Mouse position:', mouseX, mouseY);
+        // console.log('Mouse position:', mouseX, mouseY);
     }
 
 
@@ -848,32 +938,16 @@ function rightClick(event) {
 
     event.preventDefault();
 
-    // mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    // mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    // raycaster.setFromCamera(mouse, camera);
-    // let intersect_tiles = raycaster.intersectObjects(pickableTiles, false);
-    // const t = intersect_tiles[0].object;
-
-
-
-
-
-
     for (let i =0; i<agentData.length;i++){
 
         selected = i;
 
 
         const a = agentData[selected]
+
         selectedObject = pickableObjects[selected]
 
 
-
-
-
-        // pickableWalkingTiles.forEach(function (T){
-        //     T.material.opacity = 0;
-        // });
 
         for (let i = 0; i< rows;i++) {
             for (let j = 0; j < columns; j++) {
@@ -904,7 +978,7 @@ function rightClick(event) {
 
         let current_t = tiles[t1.userData.r][t1.userData.c];
 
-        console.log(current_t);
+        // console.log(current_t);
         selectedObject.userData.start_tile = current_t;
 
         let goal_actual_position = {
@@ -925,104 +999,21 @@ function rightClick(event) {
         let copy_path = deepCloneArray(path);
 
         path.forEach(function (G, index) {
-
+            pickableTiles[G.r * world.x / tile.w + G.c].material.opacity = 0.5;
             if (index === 0 || index === path.length-1 ){
-                pickableTiles[G.r * world.x / tile.w + G.c].material.opacity = 0.5;
+
             }
 
 
         });
 
-        console.log(copy_path);
+        // console.log(copy_path);
 
         agentData[selected].path = copy_path;
         agentData[selected].path_index = 0;
+        agentData[selected].simEnd = false;
     }
 
-    // if (selected != null) {
-    //
-    //     pickableWalkingTiles.forEach(function (T){
-    //        T.material.opacity = 0;
-    //     });
-    //
-    //     for (let i = 0; i< rows;i++) {
-    //         for (let j = 0; j < columns; j++) {
-    //             // Create a box geometry and a mesh material
-    //
-    //             tiles[i][j].g = tiles[i][j].cost;
-    //             tiles[i][j].h = 0;
-    //             tiles[i][j].f = 0;
-    //             tiles[i][j].parent = null;
-    //         }
-    //     }
-    //
-    //
-    //     let actual_position = {
-    //         x: agentData[selected].x + world.x / 2,
-    //         y: agentData[selected].y,
-    //         z: agentData[selected].z + world.z / 2,
-    //
-    //     }
-    //
-    //     let [r, c] = convertWorld2Grid(actual_position);
-    //
-    //
-    //
-    //     const index = r * rows + c;
-    //
-    //     const t1 = pickableTiles[index];
-    //
-    //     let current_t = tiles[t1.userData.r][t1.userData.c];
-    //
-    //     console.log(current_t);
-    //     selectedObject.userData.start_tile = current_t;
-    //
-    //
-    //
-    //     selectedObject.userData.end_tile = tiles[t.userData.r][t.userData.c];
-    //
-    //     const path = AStar(tiles, selectedObject.userData.start_tile, selectedObject.userData.end_tile);
-    //
-    //     let copy_path = deepCloneArray(path);
-    //
-    //     path.forEach(function (G) {
-    //
-    //         pickableTiles[G.r * world.x / tile.w + G.c].material.opacity = 0.5;
-    //     });
-    //
-    //     console.log(copy_path);
-    //
-    //     agentData[selected].path = copy_path;
-    //     agentData[selected].path_index = 0;
-    //
-    //     // agentData[selected].goal_x = destination.x;
-    //     // agentData[selected].goal_z = destination.z;
-    //
-    //
-    //
-    // }
-    // else {
-    //
-    //     if(tiles[t.userData.r][t.userData.c].cost < 10){
-    //         tiles[t.userData.r][t.userData.c].cost = 10;
-    //
-    //         t.material = new THREE.MeshStandardMaterial({
-    //             transparent: true,
-    //             opacity: 1.0,
-    //             color: 0x333333 // set a color to see the transparent effect
-    //         });
-    //
-    //     }else {
-    //         tiles[t.userData.r][t.userData.c].cost = 1;
-    //         t.material= new THREE.MeshStandardMaterial({
-    //             transparent: true,
-    //             opacity: 0.0,
-    //             color: 0x00ff00 // set a color to see the transparent effect
-    //         });
-    //     }
-    //
-    //
-    // }
 }
 
 function mouseDown(event) {
@@ -1040,7 +1031,7 @@ function mouseDown(event) {
          */
         selectedObject = intersects[i].object;
         selected = selectedObject.userData.index;
-
+        console.log(selectedObject);
         break;
     }
 }
@@ -1052,7 +1043,40 @@ function render() {
 
 function animate() {
     requestAnimationFrame(animate);
-    PHY.step(RADIUS, agentData, pickableWall, world)
+    PHY.step(RADIUS, agentData, pickableWall, world, wallData, WORLDUNIT);
+    // const frameNumber = parseInt(document.getElementById('frame').value);
+
+    let baseFlag = true;
+    agentData.forEach(function (agent, index){
+
+        if (agent.simEnd === null){
+            baseFlag = baseFlag && false;
+            return null;
+        }
+
+        baseFlag = baseFlag && agent.simEnd;
+    })
+
+
+    if (!baseFlag && global_frame_pointer < 10000){
+
+        // Generate the frame data for the specified frame
+        const frameData = {
+            frame: global_frame_pointer,
+            agents: agentData.map(agent => ({
+                id: agent.index,
+                x: agent.x,
+                y: agent.y,
+                z: agent.z,
+            })),
+        };
+        global_frames[global_frame_pointer] = frameData;
+
+
+        global_frame_pointer++;
+    }
+
+
     agentData.forEach(function(member) {
         member.agent.position.x = member.x;
         member.agent.position.y = member.y;
@@ -1068,6 +1092,8 @@ function animate() {
     });
     renderer.render(scene, camera);
     stats.update()
+
+
 };
 
 
