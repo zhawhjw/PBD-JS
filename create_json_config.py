@@ -22,17 +22,17 @@ if __name__ == "__main__":
         }
         data.append(agent_data)
 
-    # Write the data to a JSON file
-    with open('positions.json', 'w') as jsonfile:
-        json.dump(data, jsonfile)
+#     Write the data to a JSON file
+#     with open('positions.json', 'w') as jsonfile:
+#         json.dump(data, jsonfile)
 
     json_data = json.dumps(data)
 
     function_name = "agentConfig"
-    filename = "positions.js"
+    fileame = "positions.js"
     # Create the JavaScript function code
     js_code = f"export function {function_name}() {{\n  return {json_data};\n}}"
 
     # Write the code to the JavaScript file
-    with open(filename, 'w') as js_file:
+    with open('js/' + filename, 'w') as js_file:
         js_file.write(js_code)
