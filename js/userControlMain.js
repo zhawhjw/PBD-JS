@@ -872,7 +872,7 @@ function downloadSimData() {
         // Download the JSON file
         const link = document.createElement('a');
         link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
-        link.setAttribute('download', `simulation_${frameNumber}.json`);
+        link.setAttribute('download', `simulation.json`);
         link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
