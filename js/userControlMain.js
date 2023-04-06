@@ -31,6 +31,8 @@ class Tile {
     }
 }
 
+let m;
+
 let renderer, scene, camera;
 let world = {
     x: 100,
@@ -55,7 +57,7 @@ let grid, ring;
 let rows, columns;
 let spotLights = {};
 let topTexture;
-const RADIUS = 0.4;
+const RADIUS = 1;
 const WORLDUNIT = 1;
 const blueAgentMaterial = new THREE.MeshLambertMaterial({
     color: 0x0000ff
@@ -303,6 +305,22 @@ function Walkable(startTile, endTile){
 
 function heuristic(a, b) {
     return Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
+}
+
+function createPBDMatrix(){
+    // should be called after init()
+    m = new Array(agentData.length);
+    for (let i =0; i<m.length;i++){
+        m[i] = new Array(agentData.length);
+    }
+
+    for (let i = 0; i<m.length;i++){
+        for (let j = 0; j<m[0].length;j++){
+            m[i][j] = false;
+        }
+    }
+
+
 }
 
 
@@ -566,13 +584,55 @@ function init() {
                 simEnd:null,
 
                 correction: false,
-                collidewall : [[...obstacles].map(c => false)],
+
+                // fpx :0,
+                // fpz :0,
+
+                cvx :0,
+                cvz :0,
+
+
+
             });
             i += 1;
         }
     }
 
+    function addOneAgents(agentData, id,
+                          startPos, goalPos,
+                          velocityMagnitude) {
 
+        let vx = 0,
+            vz = 0;
+        let distanceToGoal = PHY.distance(startPos.x, startPos.z,
+            goalPos.x, goalPos.z);
+        vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
+        vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
+
+
+        agentData.push({
+            index: id,
+            x: startPos.x,
+            y: 2.0,
+            z: startPos.z,
+            goal_x: goalPos.x,
+            goal_y: 0.0,
+            goal_z: goalPos.z,
+            vx: vx,
+            vy: 0.0,
+            vz: vz,
+            v_pref: Math.sqrt(vx * vx + vz * vz),
+            radius: RADIUS,
+            invmass: 0.5,
+            group_id: 1,
+
+            path : null,
+            path_index: 0,
+            correction: false,
+            collidewall : [[...obstacles].map(c => false)],
+        });
+
+    }
     function defaultAgentConfiguration(){
         addColumnAgentGroup(agentData, 4, RADIUS * 4, {
                 x: 30,
@@ -745,43 +805,9 @@ function init() {
             },
             0.8, "X", );
     }
-    // defaultAgentConfiguration();
-
-    function addOneAgents(agentData, id,
-                                 startPos, goalPos,
-                                 velocityMagnitude) {
-
-        let vx = 0,
-            vz = 0;
-        let distanceToGoal = PHY.distance(startPos.x, startPos.z,
-            goalPos.x, goalPos.z);
-        vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
-        vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
+    defaultAgentConfiguration();
 
 
-        agentData.push({
-            index: id,
-            x: startPos.x,
-            y: 2.0,
-            z: startPos.z,
-            goal_x: goalPos.x,
-            goal_y: 0.0,
-            goal_z: goalPos.z,
-            vx: vx,
-            vy: 0.0,
-            vz: vz,
-            v_pref: Math.sqrt(vx * vx + vz * vz),
-            radius: RADIUS,
-            invmass: 0.5,
-            group_id: 1,
-
-            path : null,
-            path_index: 0,
-            correction: false,
-            collidewall : [[...obstacles].map(c => false)],
-        });
-
-    }
 
     function loadFromAgentData(){
         A.agentConfig().forEach(function(item, index){
@@ -790,7 +816,7 @@ function init() {
 
         });
     }
-    loadFromAgentData();
+    // loadFromAgentData();
 
 
 
@@ -1043,7 +1069,7 @@ function render() {
 
 function animate() {
     requestAnimationFrame(animate);
-    PHY.step(RADIUS, agentData, pickableWall, world, wallData, WORLDUNIT);
+    PHY.step(RADIUS, agentData, pickableWall, world, wallData, WORLDUNIT, m);
     // const frameNumber = parseInt(document.getElementById('frame').value);
 
     let baseFlag = true;
@@ -1057,24 +1083,24 @@ function animate() {
         baseFlag = baseFlag && agent.simEnd;
     })
 
-
-    if (!baseFlag && global_frame_pointer < 10000){
-
-        // Generate the frame data for the specified frame
-        const frameData = {
-            frame: global_frame_pointer,
-            agents: agentData.map(agent => ({
-                id: agent.index,
-                x: agent.x,
-                y: agent.y,
-                z: agent.z,
-            })),
-        };
-        global_frames[global_frame_pointer] = frameData;
-
-
-        global_frame_pointer++;
-    }
+    // loading frame data
+    // if (!baseFlag && global_frame_pointer < 10000){
+    //
+    //     // Generate the frame data for the specified frame
+    //     const frameData = {
+    //         frame: global_frame_pointer,
+    //         agents: agentData.map(agent => ({
+    //             id: agent.index,
+    //             x: agent.x,
+    //             y: agent.y,
+    //             z: agent.z,
+    //         })),
+    //     };
+    //     global_frames[global_frame_pointer] = frameData;
+    //
+    //
+    //     global_frame_pointer++;
+    // }
 
 
     agentData.forEach(function(member) {
@@ -1098,6 +1124,7 @@ function animate() {
 
 
 init();
+createPBDMatrix();
 gridization();
 render();
 animate();

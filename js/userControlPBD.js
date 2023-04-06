@@ -4,9 +4,9 @@ export function distance(x1, y1, x2, y2) {
       return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
 
-export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities, WORLDUNIT) {
+export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities, WORLDUNIT, matrix) {
 
-
+    // console.log(matrix);
   /*  -----------------------  */
   /*  TODO modify lines below  */
   /*  -----------------------  */
@@ -27,46 +27,6 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         agent_j.pz += - agent_j_scaler * dir_z
     } 
   }
-    function seeThrough(startTile, endTile){
-
-        const ray = new THREE.Raycaster();
-
-
-
-        // Starting and ending coordinates of the ray
-        const startCoord = new THREE.Vector3(startTile.x, startTile.y, startTile.z);
-        const endCoord = new THREE.Vector3(endTile.x, endTile.y, endTile.z);
-
-        const distance = startCoord.distanceTo(endCoord); // Maximum distance to check
-
-        // const range = new THREE.Box3().setFromCenterAndSize(startCoord, boxSize);
-        // Set the ray's position to the starting coordinate
-
-        ray.set(startCoord, endCoord.clone().sub(startCoord).normalize());
-
-
-
-        // Check for intersection with objects in the scene
-        const intersects = ray.intersectObjects(obstacleEntities, false);
-
-        // Filter the intersections to only include objects between the two coordinates
-        const filteredIntersects = intersects.filter((intersection) => {
-            return intersection.distance <= distance && intersection.distance > 0
-
-        });
-
-        if (filteredIntersects.length > 0) {
-            // Objects exist between the two coordinates
-            // console.log('Objects exist between the two coordinates');
-            return false;
-        } else {
-            // No objects exist between the two coordinates
-            // console.log('No objects exist between the two coordinates');
-            return true;
-        }
-
-    }
-
     function degreeInBetween(vector1,vector2 ){
 
         // calculate the dot product of the two vectors
@@ -83,107 +43,43 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         return angleRad * 180 / Math.PI;
       }
 
-    function agentAhead(agent, goal){
-        // const raycaster = new THREE.Raycaster();
-        // const origin = new THREE.Vector3(startTile.x, startTile.y, startTile.z);
-        // const destination = new THREE.Vector3(endTile.x, endTile.y, endTile.z);
-        //
-        // raycaster.set(origin, destination.clone().sub(origin).normalize());
-        //
-        // const intersects = raycaster.intersectObjects(pickableWall, false);
-        //
-        // return intersects.length <= 0;
-        // const boxSize = new THREE.Vector3(RADIUS*2, RADIUS*2, RADIUS*2);
-        const ray = new THREE.Raycaster();
 
-
-
-        // Starting and ending coordinates of the ray
-        const startCoord = new THREE.Vector3(agent.x, agent.y, agent.z);
-        const endCoord = new THREE.Vector3(goal.x, goal.y, goal.z);
-
-        const distance = startCoord.distanceTo(endCoord); // Maximum distance to check
-
-        // const range = new THREE.Box3().setFromCenterAndSize(startCoord, boxSize);
-        // Set the ray's position to the starting coordinate
-
-        ray.set(startCoord, endCoord.clone().sub(startCoord).normalize());
-
-
-
-        // Check for intersection with objects in the scene
-        const intersects = ray.intersectObjects(sceneEntities, false);
-
-        // Filter the intersections to only include objects between the two coordinates
-        const filteredIntersects = intersects.filter((intersection) => {
-            return intersection.distance <= distance && intersection.distance > 0
-
-        });
-
-        return filteredIntersects.length <= 0;
-
-    }
-
-  function collisionConstraint(agent_i,agent_j)
+  function collisionConstraint(agent_i,agent_j, i, j, m)
   {
-    const d = 0.2;
-    const agentCentroidDist = distance(agent_i.px, agent_i.pz, agent_j.px, agent_j.pz );
-    // const agentDist = agentCentroidDist - AGENTSIZE - 2*d;
-    const agentDist = agentCentroidDist - AGENTSIZE;
 
-    const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
-    const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
+    const agentCentroidDist = distance(agent_i.px, agent_i.pz, agent_j.px, agent_j.pz );
+
+    const AgentDist = agentCentroidDist - AGENTSIZE;
 
     const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, agent_i.goal_x, agent_i.goal_z );
     const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, agent_j.goal_x, agent_j.goal_z );
 
-    // const dir_x_i_goal = (agent_i.goal_x- agent_i.x)/agent_i_goal_distance;
-    // const dir_z_i_goal = (agent_i.goal_z- agent_i.z)/agent_i_goal_distance;
-    // const dir_x_j_goal = (agent_j.goal_x- agent_j.x)/agent_j_goal_distance;
-    // const dir_z_j_goal = (agent_j.goal_z- agent_j.z)/agent_j_goal_distance;
+    const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
+    const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
 
-    let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * agentDist;
-    let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * agentDist;
+
+    let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+    let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+
 
     if(agentCentroidDist - AGENTSIZE < 0) {
 
-        // const flag_i = agentAhead({x:agent_i.x, y:agent_i.y, z:agent_i.z,}, {x:agent_i.goal_x, y:agent_i.goal_y, z:agent_i.goal_z} );
-        // const flag_j = agentAhead({x:agent_j.x, y:agent_j.y, z:agent_j.z,}, {x:agent_j.goal_x, y:agent_j.goal_y, z:agent_j.goal_z} );
-
-
-        agent_i.correction = true;
-        agent_j.correction = true;
-
-
-        // if agent i has the collision with the agent j, one has the smaller distance to the goal should gain 2x
-        // weight on adjusted position for giving space to another agent to navigate to its goal
         if (agent_i_goal_distance > agent_j_goal_distance) {
-            agent_j_scaler = agent_j_scaler * 3;
+            agent_j_scaler = agent_j_scaler * 2;
 
         } else if (agent_i_goal_distance < agent_j_goal_distance) {
-            agent_i_scaler = agent_i_scaler * 3;
+            agent_i_scaler = agent_i_scaler * 2;
         }
 
-        if (true) {
-            agent_i.px += agent_i_scaler * dir_x;
-            agent_i.pz += agent_i_scaler * dir_z;
-        }
 
-        if (true) {
-            agent_j.px += -agent_j_scaler * dir_x;
-            agent_j.pz += -agent_j_scaler * dir_z;
-        }
+        agent_i.px += agent_i_scaler * dir_x;
+        agent_i.pz += agent_i_scaler * dir_z;
+        agent_j.px += -agent_j_scaler * dir_x;
+        agent_j.pz += -agent_j_scaler * dir_z;
 
-    }else {
-        agent_i.correction = false;
-        agent_j.correction = false;
+
+
     }
-    // else if(agentCentroidDist - AGENTSIZE >= 0.4){
-    //     agent_i.correction = false;
-    //     agent_j.correction = false;
-    //
-    // }
-
 
 
 
@@ -205,12 +101,12 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         const wall_j_scaler = wall_invmass /(agent_i.invmass + wall_invmass) * agentDist
         if(agentDist < 0)
         {
-            agent_i.collidewall[j] = true;
+            // agent_i.collidewall[j] = true;
             agent_i.px += agent_i_scaler * dir_x + wall_j_scaler * dir_x;
             agent_i.pz += agent_i_scaler * dir_z + wall_j_scaler * dir_z;
 
         }else {
-            agent_i.collidewall[j] = false;
+            // agent_i.collidewall[j] = false;
         }
 
 
@@ -218,22 +114,22 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
 
 
 
-  function agentVelocityPlanner()  {
-    sceneEntities.forEach(function (agent_i) {
-      const distToGoal = distance(agent_i.x, agent_i.z, 
-                        agent_i.goal_x, agent_i.goal_z );
-      if(distToGoal > RADIUS)
-      {
-        const dir_x = (agent_i.goal_x- agent_i.x)/distToGoal; 
-        const dir_z = (agent_i.goal_z- agent_i.z)/distToGoal;
-        agent_i.vx = agent_i.v_pref * dir_x;
-        agent_i.vz = agent_i.v_pref * dir_z;
-      }
-      agent_i.vx = 0.9999*agent_i.vx;
-      agent_i.vz = 0.9999*agent_i.vz;      
-    });
-
-  }
+  // function agentVelocityPlanner()  {
+  //   sceneEntities.forEach(function (agent_i) {
+  //     const distToGoal = distance(agent_i.x, agent_i.z,
+  //                       agent_i.goal_x, agent_i.goal_z );
+  //     if(distToGoal > RADIUS)
+  //     {
+  //       const dir_x = (agent_i.goal_x- agent_i.x)/distToGoal;
+  //       const dir_z = (agent_i.goal_z- agent_i.z)/distToGoal;
+  //       agent_i.vx = agent_i.v_pref * dir_x;
+  //       agent_i.vz = agent_i.v_pref * dir_z;
+  //     }
+  //     agent_i.vx = 0.9999*agent_i.vx;
+  //     agent_i.vz = 0.9999*agent_i.vz;
+  //   });
+  //
+  // }
     function isOverlapping(circle, square) {
         // Calculate the distance between the centers of the circle and square
         let dx = circle.x - square.x;
@@ -249,54 +145,54 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         return distance <= sum;
     }
 
-    function isInside(point, square) {
-        // Check if the x-coordinate of the point is inside the square
-        const isXInside = point.x > square.x && point.x < square.x + square.side;
+    // function isInside(point, square) {
+    //     // Check if the x-coordinate of the point is inside the square
+    //     const isXInside = point.x > square.x && point.x < square.x + square.side;
+    //
+    //     // Check if the y-coordinate of the point is inside the square
+    //     const isYInside = point.y > square.y && point.y < square.y + square.side;
+    //
+    //     // Return true if both coordinates are inside the square, false otherwise
+    //     return isXInside && isYInside;
+    // }
 
-        // Check if the y-coordinate of the point is inside the square
-        const isYInside = point.y > square.y && point.y < square.y + square.side;
+    // function lineIntersectsSquare(p1, p2, square) {
+    //     // Define the coordinates of the square's corners
+    //     var topLeft = { x: square.x, y: square.y };
+    //     var topRight = { x: square.x + square.side, y: square.y };
+    //     var bottomLeft = { x: square.x, y: square.y + square.side };
+    //     var bottomRight = { x: square.x + square.side, y: square.y + square.side };
+    //
+    //     // Test if the line intersects any of the square's sides
+    //     if (lineIntersectsLine(p1, p2, topLeft, topRight) ||
+    //         lineIntersectsLine(p1, p2, topRight, bottomRight) ||
+    //         lineIntersectsLine(p1, p2, bottomRight, bottomLeft) ||
+    //         lineIntersectsLine(p1, p2, bottomLeft, topLeft)) {
+    //         return true;
+    //     } else {
+    //         return false;
+    //     }
+    // }
 
-        // Return true if both coordinates are inside the square, false otherwise
-        return isXInside && isYInside;
-    }
-
-    function lineIntersectsSquare(p1, p2, square) {
-        // Define the coordinates of the square's corners
-        var topLeft = { x: square.x, y: square.y };
-        var topRight = { x: square.x + square.side, y: square.y };
-        var bottomLeft = { x: square.x, y: square.y + square.side };
-        var bottomRight = { x: square.x + square.side, y: square.y + square.side };
-
-        // Test if the line intersects any of the square's sides
-        if (lineIntersectsLine(p1, p2, topLeft, topRight) ||
-            lineIntersectsLine(p1, p2, topRight, bottomRight) ||
-            lineIntersectsLine(p1, p2, bottomRight, bottomLeft) ||
-            lineIntersectsLine(p1, p2, bottomLeft, topLeft)) {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    function lineIntersectsLine(a1, a2, b1, b2) {
-        // Calculate the slope and y-intercept of each line segment
-        var slopeA = (a2.y - a1.y) / (a2.x - a1.x);
-        var yInterceptA = a1.y - slopeA * a1.x;
-        var slopeB = (b2.y - b1.y) / (b2.x - b1.x);
-        var yInterceptB = b1.y - slopeB * b1.x;
-
-        // Calculate the x-coordinate of the intersection point
-        var x = (yInterceptB - yInterceptA) / (slopeA - slopeB);
-
-        // Check if the intersection point is within the bounds of both line segments
-        if ((x >= a1.x && x <= a2.x) || (x >= a2.x && x <= a1.x)) {
-            if ((x >= b1.x && x <= b2.x) || (x >= b2.x && x <= b1.x)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
+    // function lineIntersectsLine(a1, a2, b1, b2) {
+    //     // Calculate the slope and y-intercept of each line segment
+    //     var slopeA = (a2.y - a1.y) / (a2.x - a1.x);
+    //     var yInterceptA = a1.y - slopeA * a1.x;
+    //     var slopeB = (b2.y - b1.y) / (b2.x - b1.x);
+    //     var yInterceptB = b1.y - slopeB * b1.x;
+    //
+    //     // Calculate the x-coordinate of the intersection point
+    //     var x = (yInterceptB - yInterceptA) / (slopeA - slopeB);
+    //
+    //     // Check if the intersection point is within the bounds of both line segments
+    //     if ((x >= a1.x && x <= a2.x) || (x >= a2.x && x <= a1.x)) {
+    //         if ((x >= b1.x && x <= b2.x) || (x >= b2.x && x <= b1.x)) {
+    //             return true;
+    //         }
+    //     }
+    //
+    //     return false;
+    // }
 
 
   function agentVelocityPlannerV2(walls)  {
@@ -330,11 +226,6 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         if (agent_i.path_index >= agent_i.path.length){
 
 
-            // const a_star_dest =  agent_i.path[agent_i.path_index - 1];
-            //
-            // agent_i.goal_x = a_star_dest.x;
-            // agent_i.goal_z = a_star_dest.z;
-
             agent_i.path = null;
             agent_i.path_index = 0;
 
@@ -351,16 +242,6 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         if(agent_i.path_index >= agent_i.path.length - 1){
             t = {x:agent_i.goal_x, z:agent_i.goal_z}
         }
-
-        // let flag = false;
-
-        // walls.forEach(function (wall_index, wall) {
-        //     flag = flag || lineIntersectsSquare({x: agent_i.x, y:agent_i.z}, {x: t.x, y:t.z}, {x: wall.x, y:wall.z});
-        //
-        // })
-
-        // flag = agent_i.collidewall.includes(true) && agent_i.correction;
-
 
         const distToGoal = distance(agent_i.x, agent_i.z,
             t.x, t.z );
@@ -433,7 +314,7 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
           j=i+1;
           while(j<sceneEntities.length)
           {
-            collisionConstraint(sceneEntities[i],sceneEntities[j])
+            collisionConstraint(sceneEntities[i],sceneEntities[j], i, j, matrix)
             j+=1;
           }
           i+=1
@@ -451,18 +332,6 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
           i+=1
       }
 
-      // i=0;
-      // while(i<sceneEntities.length)
-      // {
-      //     j=i+1;
-      //     while(j<sceneEntities.length)
-      //     {
-      //         collisionConstraint(sceneEntities[i],sceneEntities[j])
-      //         j+=1;
-      //     }
-      //     i+=1
-      // }
-
 
 
     pbdIters+=1;
@@ -471,44 +340,14 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
 
   sceneEntities.forEach(function (item) {
 
-      if(item.index === 13){
-          // console.log()
-      }
 
       item.vx = (item.px-item.x)/timestep;
       item.vz = (item.pz-item.z)/timestep;
       item.vy = (item.py-item.y)/timestep;
 
-      if(item.vx < 0.0001  && item.vz < 0.0001){
-          // agent_i.path_index--;
-          // console.log(item.index);
-      }
-
-
       item.x = item.px;
       item.z = item.pz;
       item.y = item.py;
-
-    // if (item.correction){
-    //     item.vx = (item.px-item.x)/timestep * 0.1;
-    //     item.vz = (item.pz-item.z)/timestep * 0.1;
-    //     item.vy = (item.py-item.y)/timestep ;
-    //
-    //     item.x = item.px * 0.1;
-    //     item.z = item.pz * 0.1;
-    //     item.y = item.py;
-    //
-    //
-    // }else {
-    //
-    // }
-    //
-
-
-
-
-
-
 
 
     if(item.x < -world.x/2)
