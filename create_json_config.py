@@ -29,7 +29,7 @@ if __name__ == "__main__":
     json_data = json.dumps(data)
 
     function_name = "agentConfig"
-    fileame = "positions.js"
+    filename = "positions.js"
     # Create the JavaScript function code
     js_code = f"export function {function_name}() {{\n  return {json_data};\n}}"
 
