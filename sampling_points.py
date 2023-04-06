@@ -61,11 +61,11 @@ def collision_constraint(x1, y1, x2, y2, ):
     if magnitude < particle_distance:
         dist = abs(particle_distance - magnitude)
         unit_direct = np.array(diff) / magnitude
-        delta = dist * unit_direct * 0.5
-        correction_x1 = delta[0]
-        correction_y1 = delta[1]
-        correction_x2 = -delta[0]
-        correction_y2 = -delta[1]
+        d = dist * unit_direct * 0.5
+        correction_x1 = d[0]
+        correction_y1 = d[1]
+        correction_x2 = -d[0]
+        correction_y2 = -d[1]
     return correction_x1, correction_y1, correction_x2, correction_y2
 
 
@@ -123,7 +123,7 @@ if __name__ == "__main__":
     epsilon = 0.4
     num_points = 30
 
-    start_x_shift = 20
+    start_x_shift = 40
     goal_x_shift = 20
 
     # following data
