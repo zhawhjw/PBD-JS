@@ -3,14 +3,13 @@ import * as PHY from 'simplePhysics';
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
 import Stats from 'three/addons/libs/stats.module.js';
+import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import * as F from "fontConfig"
 
-import * as A from "agentConfiguration"
 // import {agentConfig} from "./positions";
 
 // console.log(A.agentConfig());
-
-
-
 
 class Tile {
 
@@ -48,10 +47,8 @@ let pickableObjects = [];
 let pickableTiles = [];
 let pickableWalkingTiles = [];
 let pickableWall = [];
-
 let texts = [];
-
-
+let arrows = [];
 let tiles = [];
 
 let selected = null;
@@ -200,7 +197,7 @@ function AStar(ts, start, end) {
 
 
             let smoothedPathV2 = samplePointsBetweenPoints(smoothedPath, 5);
-            
+
 
 
 
@@ -462,6 +459,8 @@ function gridization(){
 }
 
 
+const FT = F.fontConfiguration();
+
 function init() {
     // renderer
     renderer = new THREE.WebGLRenderer();
@@ -536,7 +535,7 @@ function init() {
     });
     grid = new THREE.Mesh(geometry, material);
     grid.castShadow = true; //default is false
-    grid.receiveShadow = true; //default  
+    grid.receiveShadow = true; //default
     grid.rotation.order = 'YXZ';
     grid.rotation.y = -Math.PI / 2;
     grid.rotation.x = -Math.PI / 2;
@@ -553,8 +552,8 @@ function init() {
     ring.position.y += 0.01;
 
     function addColumnAgentGroup(agentData, numAgents, spacing,
-        startPos, goalPos,
-        velocityMagnitude, direction) {
+                                 startPos, goalPos,
+                                 velocityMagnitude, direction) {
         let i = 0;
         let initalIdx = agentData.length;
         let dx = 0,
@@ -595,6 +594,7 @@ function init() {
 
                 correction: false,
                 move: true,
+                waitAgent:null,
                 // fpx :0,
                 // fpz :0,
 
@@ -639,7 +639,8 @@ function init() {
             path : null,
             path_index: 0,
             correction: false,
-            collidewall : [[...obstacles].map(c => false)],
+
+            move: true,
         });
 
     }
@@ -860,9 +861,47 @@ function init() {
         agent.userData = {
             "index": item.index,
             "start_tile": null,
-            "end_tile": null
+            "end_tile": null,
+            "tm": null,
         };
+
+
+
+        const fontLoader = new FontLoader();
+
+
+
+        fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
+
+            // console.log(FT);
+            // Create a TextGeometry with the number and the loaded font
+            const textGeometry = new TextGeometry(item.index.toString(), {font: font, size: 0.5, height: 0});
+            const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+            textMesh.position.set(item.agent.position.x, item.agent.position.y + 5, item.agent.position.z); // Set the position of the text relative to the cube
+
+
+            agent.userData.tm = textMesh;
+            scene.add(textMesh);
+            texts.push(textMesh);
+
+        });
+
+
+        let dir = new THREE.Vector3( 1, 0, 0 );
+        let origin = agent.position;
+        let length = 5;
+        let hex = 0xffff00;
+
+        let arrowHelper = new THREE.ArrowHelper( dir, origin, length, hex );
+        // arrowHelper.dir
+        scene.add( arrowHelper );
+        arrows.push(arrowHelper);
+
+
+
         scene.add(agent);
+
         // -----------------
         //adding spotlight code
         if(index ===0){
@@ -884,6 +923,7 @@ function init() {
         // ----------------
         item.agent = agent;
         pickableObjects.push(agent);
+
     });
     window.addEventListener("resize", onWindowResize);
     window.addEventListener("click", mouseDown, false);
@@ -1094,7 +1134,7 @@ function mouseDown(event) {
     selected = null;
     var intersects = raycaster.intersectObjects(pickableObjects, false);
     for (var i = 0; i < intersects.length; i++) {
-        /* TODO finish this part as 
+        /* TODO finish this part as
          */
         selectedObject = intersects[i].object;
         selected = selectedObject.userData.index;
@@ -1103,9 +1143,31 @@ function mouseDown(event) {
     }
 }
 
+
+
+function getUnitVector(vector){
+    // Define the 2D vector
+    // const vector = { x: 3, y: 4 }; // Example vector
+
+    // Calculate the magnitude (length) of the vector
+    const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+
+    // Calculate the unit vector
+    const unitVector = {
+        x: vector.x / magnitude,
+        y: vector.y / magnitude
+    };
+
+    return unitVector;
+}
+
+
+
 function render() {
     renderer.render(scene, camera);
 }
+
+
 
 
 function animate() {
@@ -1124,36 +1186,42 @@ function animate() {
         baseFlag = baseFlag && agent.simEnd;
     })
 
-    // loading frame data
-    // if (!baseFlag && global_frame_pointer < 10000){
-    //
-    //     // Generate the frame data for the specified frame
-    //     const frameData = {
-    //         frame: global_frame_pointer,
-    //         agents: agentData.map(agent => ({
-    //             id: agent.index,
-    //             x: agent.x,
-    //             y: agent.y,
-    //             z: agent.z,
-    //         })),
-    //     };
-    //     global_frames[global_frame_pointer] = frameData;
-    //
-    //
-    //     global_frame_pointer++;
-    // }
 
 
-    agentData.forEach(function(member) {
+    agentData.forEach(function(member, index) {
         member.agent.position.x = member.x;
         member.agent.position.y = member.y;
         member.agent.position.z = member.z;
         member.agent.material = redAgentMaterial;
+
+        if (texts.length>0){
+            texts[index].position.x = member.x;
+            texts[index].position.y = member.y + 5;
+            texts[index].position.z = member.z;
+        }
+
+        if (arrows.length>0){
+
+            let newSourcePos = member.agent.position;
+            let newTargetPos = new THREE.Vector3(member.x, member.y, member.z);
+
+            arrows[index].position.x = member.x;
+            arrows[index].position.y = member.y;
+            arrows[index].position.z = member.z;
+
+
+            // arrows[index].position.set(newSourcePos);
+            // let direction = new THREE.Vector3().sub(newTargetPos, newSourcePos);
+            let direction = new THREE.Vector3(member.vx, 0, member.vz);
+            arrows[index].setDirection(direction.normalize());
+            arrows[index].setLength(direction.length()*5);
+        }
+
         if (selected != null && member.index === selected) {
             member.agent.material = blueAgentMaterial;
         }
-        /* TODO finish this part for spotlight agents 
-        
+        /* TODO finish this part for spotlight agents
+
 
          */
     });

@@ -6,6 +6,7 @@ import Stats from 'three/addons/libs/stats.module.js';
 
 import * as A from "agentConfiguration"
 // import {agentConfig} from "./positions";
+import {GUI} from 'three/addons/libs/lil-gui.module.min.js';
 
 // console.log(A.agentConfig());
 
@@ -31,11 +32,52 @@ class Tile {
     }
 }
 
+
+
+//
+// let gui;
+// const api = {
+//     state: 'Noise',
+//     camera: 'Camera'
+// };
+// function createGUI() {
+//     // TODO append your noise name to the states list below
+//     const states = ['Rule-Based', 'Random', 'Blue Noise'];
+//     const cameras = ['Top View', 'FPS'];
+//     gui = new GUI();
+//     const statesFolder = gui.addFolder('States');
+//     const camerasFolder = gui.addFolder('Cameras');
+//     const clipCtrl = statesFolder.add(api, 'state').options(states);
+//     const cameraCtrl = camerasFolder.add(api, 'camera').options(cameras);
+//     cameraCtrl.onChange(function() {
+//
+//     });
+//     clipCtrl.onChange(function() {
+//         // switchNoise(api.state);
+//     });
+//     statesFolder.open();
+// }
+//
+// createGUI();
+let stats = new Stats();
+document.body.appendChild(stats.dom);
+
+
 let renderer, scene, camera;
 let world = {
     x: 100,
     z: 100
 };
+
+
+
+const start_point = {
+    x: 0 - world.x / 2,
+    y: 0,
+    z: 0 - world.z / 2,
+};
+let global_frames = []; // An array to hold the frame data
+let global_frame_pointer = 0;
 let agentData = [];
 let wallData = [];
 // for ray to detect
@@ -43,6 +85,9 @@ let pickableObjects = [];
 let pickableTiles = [];
 let pickableWalkingTiles = [];
 let pickableWall = [];
+
+let sampledAgentData = [];
+
 
 let tiles = [];
 
@@ -64,8 +109,8 @@ const redAgentMaterial = new THREE.MeshLambertMaterial({
     color: 0xff0000
 });
 
-const stats = new Stats();
-document.body.appendChild(stats.dom)
+// const stats = new Stats();
+// document.body.appendChild(stats.dom)
 
 const tile = {
     w:WORLDUNIT * 2,
@@ -73,7 +118,223 @@ const tile = {
 }
 
 
-const obstacles = [
+const w = 10;
+const h = 45;
+const particle_distance = RADIUS * 2;
+const epsilon = 0.4;
+const num_points = 40;
+
+let opening_size = 2;
+let start_x_shift = 40;
+let goal_x_shift = 10;
+
+let goal_x = 0 + goal_x_shift;
+
+
+// renderer = new THREE.WebGLRenderer();
+// renderer.shadowMap.enabled = true;
+// renderer.shadowMap.type = THREE.PCFSoftShadowMap; //
+// renderer.setSize(window.innerWidth, window.innerHeight);
+// document.body.appendChild(renderer.domElement);
+
+function clean(){
+
+    while(scene.children.length > 0){
+        scene.remove(scene.children[0]);
+    }
+
+
+    console.log('dispose renderer!')
+    renderer.dispose()
+
+    scene.traverse(object => {
+        if (!object.isMesh) return
+
+        console.log('dispose geometry!')
+        object.geometry.dispose()
+
+        if (object.material.isMaterial) {
+            cleanMaterial(object.material)
+        } else {
+            // an array of materials
+            for (const material of object.material) cleanMaterial(material)
+        }
+    })
+
+    const cleanMaterial = material => {
+        console.log('dispose material!')
+        material.dispose()
+
+        // dispose textures
+        for (const key of Object.keys(material)) {
+            const value = material[key]
+            if (value && typeof value === 'object' && 'minFilter' in value) {
+                console.log('dispose texture!')
+                value.dispose()
+            }
+        }
+    }
+
+
+
+    agentData.length = 0;
+    wallData.length = 0;
+    pickableObjects.length = 0;
+    pickableTiles.length = 0;
+    pickableWalkingTiles.length = 0;
+    pickableWall.length = 0;
+    tiles.length = 0;
+    sampledAgentData.length = 0;
+    global_frames.length = 0; // An array to hold the frame data
+    global_frame_pointer = 0;
+
+    spotLights = {};
+    for (let prop in spotLights) {
+        if (spotLights.hasOwnProperty(prop)) {
+            delete spotLights[prop];
+        }
+    }
+
+    camera  = null;
+    ring = grid = selectedObject = selected = rows = columns = null;
+    topTexture = null;
+
+
+
+    // removeAllChildNodes(document.body);
+
+
+}
+
+// Math.seed = function(s) {
+//     let mask = 0xffffffff;
+//     let m_w  = (123456789 + s) & mask;
+//     let m_z  = (987654321 - s) & mask;
+//
+//     return function() {
+//         m_z = (36969 * (m_z & 65535) + (m_z >>> 16)) & mask;
+//         m_w = (18000 * (m_w & 65535) + (m_w >>> 16)) & mask;
+//
+//         let result = ((m_z << 16) + (m_w & 65535)) >>> 0;
+//         result /= 4294967296;
+//         return result;
+//     }
+// }
+
+function removeAllChildNodes(parent) {
+    while (parent.firstChild) {
+        parent.removeChild(parent.firstChild);
+    }
+}
+
+Math.seed = function (s){
+    let myrng = new Math.seedrandom(s.toString());
+    return function(){
+        return myrng();
+    };
+}
+
+
+// # Returns theta in [-pi/2, 3pi/2]
+function generate_theta(a, b, seed){
+
+    let u = Math.seed(seed - 3456)()  / 4.0;
+    let theta = Math.atan(b / a * Math.tan(2 * Math.PI * u));
+    let v = Math.seed(seed +987)();
+
+    if (v < 0.25)
+        return theta
+    else if (v < 0.5)
+        return Math.PI - theta
+    else if (v < 0.75)
+        return Math.PI + theta
+    else
+        return -theta
+}
+
+function radius(a, b, theta){
+    return a * b / Math.sqrt((b * Math.cos(theta)) ** 2 + (a * Math.sin(theta)) ** 2);
+}
+
+function random_point(a, b, s){
+    let random_theta = generate_theta(a, b, s)
+    let max_radius = radius(a, b, random_theta)
+    let random_radius = max_radius * Math.sqrt(Math.seed(s + 3456)())
+
+    return [
+        random_radius * Math.cos(random_theta),
+        random_radius * Math.sin(random_theta)
+    ]
+}
+
+function get_magnitude(vector, a){
+    let r = 0;
+    vector.forEach(function (item){
+        r += (item / a) ** 2;
+    })
+
+    if (a > 0)
+        return a * Math.sqrt(r);
+    else
+        return Math.sqrt(r);
+}
+
+
+
+function collision_constraint(x1, y1, x2, y2){
+    let correction_x1 = 0.0;
+    let correction_y1 = 0.0;
+    let correction_x2 = 0.0;
+    let correction_y2 = 0.0;
+
+    let diff = [x1 - x2, y1 - y2]
+    let alpha = Math.max(...diff)
+    let magnitude = get_magnitude(diff, alpha)
+    if (magnitude < particle_distance){
+        let dist = Math.abs(particle_distance - magnitude);
+        let dividedNum = num => num/magnitude;
+        let unit_direct =  diff.map(dividedNum);
+        if (magnitude < 0.01)
+            unit_direct = [Math.sqrt(2)/2, Math.sqrt(2)/2];
+
+
+        let [dx, dy] = unit_direct;
+        // let d = dist * unit_direct * 0.5
+        correction_x1 = dist * dx * 0.5;
+        correction_y1 = dist * dy * 0.5;
+        correction_x2 = -dist * dx * 0.5;
+        correction_y2 = -dist * dy * 0.5;
+    }
+
+    return [correction_x1, correction_y1, correction_x2, correction_y2]
+}
+
+
+function convertGrid2World(r, c){
+
+
+
+    const object_position = {
+        'x': start_point.x + tile.w / 2 + r * tile.w,
+        'y': 1,
+        'z': start_point.z + tile.h / 2 + c * tile.h,
+    }
+
+    return [object_position['x'], object_position['z']]
+}
+
+
+
+
+
+
+function sliceArrayWithWindow(arr, k) {
+    const windowStart = Math.floor(arr.length / 2) - Math.floor(k / 2);
+    const windowEnd = windowStart + k - 1;
+    return arr.slice(windowStart, windowEnd + 1);
+}
+
+let allobstacles = [
     [20, 0],
     [20, 1],
     [20, 2],
@@ -94,9 +355,9 @@ const obstacles = [
     [20, 17],
     [20, 18],
     [20, 19],
-    // [20, 20],
-
-    // [20, 22],
+    [20, 20],
+    [20, 21],
+    [20, 22],
     [20, 23],
     [20, 24],
     [20, 25],
@@ -127,8 +388,8 @@ const obstacles = [
 
 
 ]
-
-
+let opening = sliceArrayWithWindow(allobstacles, opening_size);
+let obstacles = allobstacles.filter(x => !opening.includes(x));
 
 function checkContainsTuple(base, checked){
     return base.some((arr) =>
@@ -137,6 +398,185 @@ function checkContainsTuple(base, checked){
 }
 
 
+let text = {
+    left_dist2opening: start_x_shift,
+    right_dist2opening: goal_x_shift,
+    opening: opening.length,
+    AgentNumber: num_points,
+    Seed:1234
+};
+
+// let myRandomFunction = Math.seed(text.Seed);
+// let randomNumber = myRandomFunction();
+
+let gui = new GUI({ autoPlace: false });
+let menu = gui.addFolder('folder');
+menu.add(text, 'left_dist2opening', 0, 40).name('Dist2Start').onChange(function (){});
+menu.add(text, 'right_dist2opening', 0, 40).name('Dist2Goal').onChange(function (){});
+menu.add(text, 'opening',  1, 50).step(1).name('Opening Size').onChange(function (){
+    clean();
+    init();
+    gridization();
+});
+menu.add(text, 'AgentNumber',  10, 80).step(1).name('Agent Number').onChange(function (){});
+menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function (){
+    // myRandomFunction = Math.seed(text.Seed);
+    // randomNumber = myRandomFunction();
+    // console.log(randomNumber);
+    clean();
+    init();
+    gridization();
+    // render();
+});
+
+const customContainer = document.getElementById('my-gui-container');
+customContainer.appendChild(gui.domElement);
+
+const wall_material = new THREE.MeshStandardMaterial({
+    transparent: true,
+    opacity: 1.0,
+    color: 0x333333 // set a color to disable the transparent effect
+});
+
+
+const transparency_material = new THREE.MeshStandardMaterial({
+    transparent: true,
+    opacity: 0.0,
+    color: 0x00ff00 // set a color to see the transparent effect
+});
+
+
+function gaussianSampling(){
+    const mx = 20;
+    let real_x1, real_y1, real_x2, real_y2;
+    let real_x, real_y;
+
+    let opens = [];
+    opening.forEach(function (item){
+        opens.push(item[1]);
+    });
+
+    // console.log(opens);
+
+    if (opens.length === 1) {
+        [real_x, real_y] = convertGrid2World(mx, opens[0]);
+    }else if (opens.length === 2){
+        [real_x1, real_y1] = convertGrid2World(mx, opens[0]);
+        [real_x2, real_y2] = convertGrid2World(mx, opens[1]);
+        [real_x, real_y] = [(real_x1 + real_x2) / 2, (real_y1 + real_y2) / 2];
+    } else if (opens.length % 2 !== 0){
+        let mid = Math.floor(opens.length / 2);
+        const middle = opens[mid];
+        [real_x, real_y] = convertGrid2World(mx, middle);
+    } else{
+        let mid1 = Math.floor(opens.length / 2);
+        let mid2 = Math.floor(opens.length / 2) + 1;
+        [real_x1, real_y1] = convertGrid2World(mx, opens[mid1]);
+        [real_x2, real_y2] = convertGrid2World(mx, opens[mid2]);
+        [real_x, real_y] = [(real_x1 + real_x2) / 2, (real_y1 + real_y2) / 2];
+    }
+
+    console.log(real_x + ", " + real_y);
+// print("{} {}".format(real_x, real_y))
+
+
+
+
+    let points = Array(num_points).fill().map((_, index) => random_point(w, h, text.Seed + index));
+// console.log(array);
+
+    for (let i =0; i<points.length;i++){
+        for (let j =0; j<points.length;j++){
+
+            if (i === j){
+                continue;
+            }
+
+
+            if (j === 39){
+                console.log();
+            }
+
+            let p1 = points[i];
+            let p2 = points[j];
+
+            let [dx1, dy1, dx2, dy2] = collision_constraint(p1[0], p1[1], p2[0], p2[1]);
+
+            p1[0] += dx1
+            p1[1] += dy1
+
+            p2[0] += dx2
+            p2[1] += dy2
+
+            points[i] = p1
+            points[j] = p2
+        }
+    }
+
+
+
+    for (let i =0; i<points.length;i++){
+        let [x, y] = points[i];
+
+        points[i] = [x - start_x_shift, y];
+    }
+
+
+
+
+    let goals = [];
+    let goalsV2 = [];
+
+    points.forEach(function (item, idx){
+        goals.push([goal_x, real_y - idx * (particle_distance + epsilon)])
+    });
+
+
+    let center_y_of_goals = (goals[0][1] + goals[goals.length-1][1]) / 2;
+
+    let delta = Math.abs(real_y - center_y_of_goals);
+    goals.forEach(function (item, idx){
+        let [x, y] = item;
+        goalsV2.push([x, y + delta])
+    });
+
+    console.log(points);
+    console.log(goalsV2);
+
+    let sampledAgent = [];
+    for (let i = 0; i<points.length;i++){
+
+        const start = points[i];
+        const goal = goalsV2[i];
+
+        const agent_data = {
+            'agent_id': i + 1,
+            'x': start[0],
+            'y': start[1],
+            'gx': goal[0],
+            'gy': goal[1]
+        }
+
+        sampledAgent.push(agent_data);
+    }
+
+    // print("Max Y: {}, Min Y: {}".format(max(np.array(goals)[:, 1]), min(np.array(goals)[:, 1])))
+
+    return sampledAgent;
+}
+
+// let goals = [[goal_x, real_y - idx * (particle_distance + epsilon)] for idx, (x, y) in enumerate(points)]
+
+
+// console.log(sampledAgentData);
+
+
+
+
+
+
+
+// let points = np.array([random_point(w, h) for _ in range(num_points)])
 
 function AStar(ts, start, end) {
     const openSet = [start];
@@ -191,9 +631,13 @@ function AStar(ts, start, end) {
             smoothedPath.push(path[pointer-1]);
 
 
+            let smoothedPathV2 = samplePointsBetweenPoints(smoothedPath, 5);
 
 
-            return smoothedPath;
+
+
+
+            return [smoothedPath, smoothedPathV2];
         }
 
         // place picked tile from unvisited set to visited set
@@ -250,8 +694,6 @@ function AStar(ts, start, end) {
     return null;
 }
 
-
-
 function Walkable(startTile, endTile){
     // const raycaster = new THREE.Raycaster();
     // const origin = new THREE.Vector3(startTile.x, startTile.y, startTile.z);
@@ -305,7 +747,6 @@ function heuristic(a, b) {
     return Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
 }
 
-
 function cut(){
     let world_width = world.x;
     let world_height = world.z;
@@ -332,11 +773,7 @@ function gridization(){
     [rows, columns] = cut();
 
 
-    const start_point = {
-        x: 0 - world.x / 2,
-        y: 0,
-        z: 0 - world.z / 2,
-    };
+
 
 
     const basicCost = 1;
@@ -378,19 +815,11 @@ function gridization(){
 
             let material;
             if (t.cost >= 10){
-                material = new THREE.MeshStandardMaterial({
-                    transparent: true,
-                    opacity: 1.0,
-                    color: 0x333333 // set a color to disable the transparent effect
-                });
+                material = wall_material;
 
 
             }else {
-                material = new THREE.MeshStandardMaterial({
-                    transparent: true,
-                    opacity: 0.0,
-                    color: 0x00ff00 // set a color to see the transparent effect
-                });
+                material = transparency_material;
             }
 
 
@@ -433,14 +862,77 @@ function gridization(){
 
 }
 
+// renderer
+renderer = new THREE.WebGLRenderer();
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; //
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
 
 function init() {
-    // renderer
-    renderer = new THREE.WebGLRenderer();
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; //
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+
+    // stats = new Stats();
+
+    allobstacles = [
+        [20, 0],
+        [20, 1],
+        [20, 2],
+        [20, 3],
+        [20, 4],
+        [20, 5],
+        [20, 6],
+        [20, 7],
+        [20, 8],
+        [20, 9],
+        [20, 10],
+        [20, 11],
+        [20, 12],
+        [20, 13],
+        [20, 14],
+        [20, 15],
+        [20, 16],
+        [20, 17],
+        [20, 18],
+        [20, 19],
+        [20, 20],
+        [20, 21],
+        [20, 22],
+        [20, 23],
+        [20, 24],
+        [20, 25],
+        [20, 26],
+        [20, 27],
+        [20, 28],
+        [20, 29],
+        [20, 30],
+        [20, 31],
+        [20, 32],
+        [20, 33],
+        [20, 34],
+        [20, 35],
+        [20, 36],
+        [20, 37],
+        [20, 38],
+        [20, 39],
+        [20, 40],
+        [20, 41],
+        [20, 42],
+        [20, 43],
+        [20, 44],
+        [20, 45],
+        [20, 46],
+        [20, 47],
+        [20, 48],
+        [20, 49],
+
+
+    ]
+    opening = sliceArrayWithWindow(allobstacles, text.opening);
+    obstacles = allobstacles.filter(x => !opening.includes(x));
+
+
+
+    sampledAgentData =  gaussianSampling();
 
 
 
@@ -492,11 +984,11 @@ function init() {
     texture.repeat.set(repeats, repeats);
 
 
-    topTexture = loader.load('resources/triangle2.png');
-    //topTexture.wrapS = THREE.RepeatWrapping;
-    //topTexture.wrapT = THREE.RepeatWrapping;
-    topTexture.magFilter = THREE.NearestFilter;
-    topTexture.repeat.set(3, 3);
+    // topTexture = loader.load('resources/triangle2.png');
+    // //topTexture.wrapS = THREE.RepeatWrapping;
+    // //topTexture.wrapT = THREE.RepeatWrapping;
+    // topTexture.magFilter = THREE.NearestFilter;
+    // topTexture.repeat.set(3, 3);
     //topTexture.rotation = -Math.PI / 2;
     // grid
     const geometry = new THREE.PlaneGeometry(world.x, world.z, 10, 10);
@@ -566,185 +1058,188 @@ function init() {
                 simEnd:null,
 
                 correction: false,
-                collidewall : [[...obstacles].map(c => false)],
+
+                move: true,
             });
             i += 1;
         }
     }
+    // var myrng = new Math.seedrandom('hello.');
+    // console.log(myrng());                // Always 0.9282578795792454
+    // console.log(myrng());
 
-
-    function defaultAgentConfiguration(){
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: 45
-            }, {
-                x: -35,
-                z: 45
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: 40
-            }, {
-                x: -35,
-                z: 40
-            },
-            0.8, "X", );
-
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: 35
-            }, {
-                x: -35,
-                z: 35
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: 30
-            }, {
-                x: -35,
-                z: 30
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: 25
-            }, {
-                x: -35,
-                z: 25
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: 20
-            }, {
-                x: -35,
-                z: 20
-            },
-            0.8, "X", );
-
-
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: 15
-            }, {
-                x: -35,
-                z: 15
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: 10
-            }, {
-                x: -35,
-                z: 10
-            },
-            0.8, "X", );
-
-        // new agent
-        //
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: 5
-            }, {
-                x: -35,
-                z: 5
-            },
-            0.8, "X", );
-
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: 0
-            }, {
-                x: -35,
-                z: 0
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -5
-            }, {
-                x: -35,
-                z: -5
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -10
-            }, {
-                x: -35,
-                z: -10
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -15
-            }, {
-                x: -35,
-                z: -15
-            },
-            0.8, "X", );
-
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -20
-            }, {
-                x: -35,
-                z: -20
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -25
-            }, {
-                x: -35,
-                z: -25
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -30
-            }, {
-                x: -35,
-                z: -30
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -35
-            }, {
-                x: -35,
-                z: -35
-            },
-            0.8, "X", );
-
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 25,
-                z: -40
-            }, {
-                x: -35,
-                z: -40
-            },
-            0.8, "X", );
-    }
+    // function defaultAgentConfiguration(){
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: 45
+    //         }, {
+    //             x: -35,
+    //             z: 45
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: 40
+    //         }, {
+    //             x: -35,
+    //             z: 40
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: 35
+    //         }, {
+    //             x: -35,
+    //             z: 35
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: 30
+    //         }, {
+    //             x: -35,
+    //             z: 30
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: 25
+    //         }, {
+    //             x: -35,
+    //             z: 25
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: 20
+    //         }, {
+    //             x: -35,
+    //             z: 20
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: 15
+    //         }, {
+    //             x: -35,
+    //             z: 15
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: 10
+    //         }, {
+    //             x: -35,
+    //             z: 10
+    //         },
+    //         0.8, "X", );
+    //
+    //     // new agent
+    //     //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: 5
+    //         }, {
+    //             x: -35,
+    //             z: 5
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: 0
+    //         }, {
+    //             x: -35,
+    //             z: 0
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -5
+    //         }, {
+    //             x: -35,
+    //             z: -5
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -10
+    //         }, {
+    //             x: -35,
+    //             z: -10
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -15
+    //         }, {
+    //             x: -35,
+    //             z: -15
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -20
+    //         }, {
+    //             x: -35,
+    //             z: -20
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -25
+    //         }, {
+    //             x: -35,
+    //             z: -25
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -30
+    //         }, {
+    //             x: -35,
+    //             z: -30
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -35
+    //         }, {
+    //             x: -35,
+    //             z: -35
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 25,
+    //             z: -40
+    //         }, {
+    //             x: -35,
+    //             z: -40
+    //         },
+    //         0.8, "X", );
+    // }
     // defaultAgentConfiguration();
 
     function addOneAgents(agentData, id,
@@ -778,19 +1273,27 @@ function init() {
             path : null,
             path_index: 0,
             correction: false,
-            collidewall : [[...obstacles].map(c => false)],
+
         });
 
     }
-
-    function loadFromAgentData(){
-        A.agentConfig().forEach(function(item, index){
+    function loadFromAgentGUI(){
+        sampledAgentData.forEach(function(item, index){
 
             addOneAgents(agentData, item.agent_id, {x:item.x, z:item.y}, {x:item.gx, z:item.gy}, 0.8);
 
         });
     }
-    loadFromAgentData();
+    loadFromAgentGUI();
+
+    // function loadFromAgentData(){
+    //     A.agentConfig().forEach(function(item, index){
+    //
+    //         addOneAgents(agentData, item.agent_id, {x:item.x, z:item.y}, {x:item.gx, z:item.gy}, 0.8);
+    //
+    //     });
+    // }
+    // loadFromAgentData();
 
 
 
@@ -849,21 +1352,19 @@ function init() {
         item.agent = agent;
         pickableObjects.push(agent);
     });
-    window.addEventListener("resize", onWindowResize);
-    window.addEventListener("click", mouseDown, false);
-    window.addEventListener("mousemove", mouseMove, false);
-    window.addEventListener("contextmenu", rightClick, false);
-    document.getElementById('download-btn').addEventListener('click', downloadSimData, false);
+
+
+
+
+
 
 }
 
 
-const global_frames = []; // An array to hold the frame data
-let global_frame_pointer = 0;
 
 // Handle the button click event
 function downloadSimData() {
-    const frameNumber = parseInt(document.getElementById('frame').value);
+
 
     if (global_frames.length > 0) {
         // Convert the frames array to JSON
@@ -880,6 +1381,39 @@ function downloadSimData() {
     }
 }
 
+function samplePointsBetweenPoints(points, m) {
+    // Initialize an array to store the sampled points
+    const sampledPoints = [];
+
+    // Iterate through the array of points
+    for (let i = 0; i < points.length - 1; i++) {
+        const point1 = points[i];
+        const point2 = points[i + 1];
+
+        // Extracting x and y coordinates from point1 and point2
+        const [x1, y1] = [point1.x, point1.z];
+        const [x2, y2] = [point2.x, point2.z];
+
+        sampledPoints.push([x1, y1]);
+
+        // Generate m points between point1 and point2
+        for (let j = 1; j <= m; j++) {
+            // Calculate the x and y coordinates of the sampled point
+            const x = x1 + ((x2 - x1) * j) / (m + 1);
+            const y = y1 + ((y2 - y1) * j) / (m + 1);
+
+            // Add the sampled point to the array
+            sampledPoints.push([x, y]);
+        }
+    }
+
+    const endPoint = points[points.length-1];
+    const [ex1, ey1] = [endPoint.x, endPoint.z];
+    sampledPoints.push([ex1, ey1]);
+
+    // Return the array of sampled points
+    return sampledPoints;
+}
 
 function convertWorld2Grid(world_position){
 
@@ -994,22 +1528,22 @@ function rightClick(event) {
 
 
 
-        const path = AStar(tiles, selectedObject.userData.start_tile, selectedObject.userData.end_tile);
+        const [path, smoothPath] = AStar(tiles, selectedObject.userData.start_tile, selectedObject.userData.end_tile);
 
-        let copy_path = deepCloneArray(path);
+        // let copy_path = deepCloneArray(path);
 
         path.forEach(function (G, index) {
-            pickableTiles[G.r * world.x / tile.w + G.c].material.opacity = 0.5;
-            if (index === 0 || index === path.length-1 ){
-
-            }
+            // pickableTiles[G.r * world.x / tile.w + G.c].material.opacity = 0.5;
+            // if (index === 0 || index === path.length-1 ){
+            //
+            // }
 
 
         });
 
         // console.log(copy_path);
 
-        agentData[selected].path = copy_path;
+        agentData[selected].path = smoothPath;
         agentData[selected].path_index = 0;
         agentData[selected].simEnd = false;
     }
@@ -1099,5 +1633,10 @@ function animate() {
 
 init();
 gridization();
+window.addEventListener("resize", onWindowResize);
+window.addEventListener("click", mouseDown, false);
+window.addEventListener("mousemove", mouseMove, false);
+window.addEventListener("contextmenu", rightClick, false);
+document.getElementById('download-btn').addEventListener('click', downloadSimData, false);
 render();
 animate();

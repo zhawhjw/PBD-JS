@@ -44,6 +44,135 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
       }
 
 
+    function degreeBetween(vector1, vector2){
+        // const vector1 = { x: 0.5, y: 0.866 }; // Example vector
+        // const vector2 = { x: -0.707, y: 0.707 }; // Example vector
+
+        // Calculate the dot product of the two vectors
+        const dotProduct = vector1.x * vector2.x + vector1.y * vector2.y;
+
+        // Calculate the magnitude (length) of the vectors
+        const magnitude1 = Math.sqrt(vector1.x * vector1.x + vector1.y * vector1.y);
+        const magnitude2 = Math.sqrt(vector2.x * vector2.x + vector2.y * vector2.y);
+
+        // Calculate the cosine of the angle between the vectors
+        const cosTheta = dotProduct / (magnitude1 * magnitude2);
+
+        // Calculate the angle in radians
+        const angleRad = Math.acos(cosTheta);
+
+        // Convert radians to degrees
+        const angleDeg = angleRad * (180 / Math.PI);
+
+        // Calculate the signed angle in degrees using the atan2 function
+        const signedAngleDeg = Math.atan2(vector2.y, vector2.x) - Math.atan2(vector1.y, vector1.x);
+
+        // Ensure the angle is between 0 and 360 degrees
+        const normalizedAngleDeg = (signedAngleDeg >= 0) ? signedAngleDeg : (signedAngleDeg + 2 * Math.PI) * (180 / Math.PI);
+
+        // console.log("Angle between vectors (in degrees):", angleDeg);
+        // console.log("Signed angle between vectors (in degrees):", normalizedAngleDeg);
+
+        return angleDeg;
+
+    }
+
+    const d1 = 0.3;
+    const d2 = 0.3;
+
+    function getUnitVector(vector){
+        // Define the 2D vector
+        // const vector = { x: 3, y: 4 }; // Example vector
+
+        // Calculate the magnitude (length) of the vector
+        const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+
+        // Calculate the unit vector
+        const unitVector = {
+            x: vector.x / magnitude,
+            y: vector.y / magnitude
+        };
+
+        return unitVector;
+    }
+
+    function following(agent_i, agent_j){
+
+        if (agent_j.simEnd === true){
+            agent_j.waitAgent = null;
+            return;
+        }
+
+        const agentCentroidDist = distance(agent_i.px, agent_i.pz, agent_j.px, agent_j.pz );
+        // const agent_i_v = {x: agent_i.vx, y:agent_i.vz};
+        const agent_j_v = {x: agent_j.vx, y:agent_j.vz};
+
+        // const agent_i_uv = getUnitVector(agent_i_v);
+        const agent_j_uv = getUnitVector(agent_j_v);
+
+        // const dir_i2j = {x: agent_j.px- agent_i.px, y:agent_j.pz- agent_i.pz};
+        const dir_j2i = {x: agent_i.px - agent_j.px, y:agent_i.pz - agent_j.pz};
+
+        const flag1 = (agent_j.move === true);
+        const flag2 = ((agentCentroidDist - 2 * RADIUS) < d2);
+        const flag3 = (degreeBetween(agent_j_uv, dir_j2i) < 30);
+
+        const flag4 = (agent_j.move === false);
+        const flag5 = ((agentCentroidDist - 2 * RADIUS) > (d1 + d2));
+        const flag6 = (agent_j.waitAgent === agent_i.index);
+
+        if (agent_i.index === 49 && agent_j.index === 60  || (agent_i.index === 60 && agent_j.index === 49)){
+
+            if (agent_j.px === agent_j.x || agent_j.pz === agent_j.z){
+                console.log("hit1");
+            }
+
+            if (agent_i.px === agent_i.x || agent_i.pz === agent_i.z){
+                console.log("hit2");
+            }
+
+        }
+
+        if (!agent_j.move){
+            agent_j.px = agent_j.x;
+            agent_j.pz = agent_j.z;
+        }
+
+
+        if ( flag1 && flag2 && flag3){
+            agent_j.move = false;
+            agent_j.pbx = agent_j.px;
+            agent_j.pbz = agent_j.pz;
+            agent_j.waitAgent = agent_i.index;
+
+        }
+
+        // if reactive
+        if ( (flag4 && flag5 && flag6)){
+            agent_j.move = true;
+            agent_j.px = agent_j.pbx;
+            agent_j.pz = agent_j.pbz;
+            agent_j.waitAgent = null;
+        }
+
+        const flag7 = (agent_j.waitAgent === agent_i.index) && (agent_i.waitAgent === agent_j.index);
+        // const flag8 = (agent_i.simEnd);
+
+        // if deadlock
+
+
+        // if i reaches goal
+        // if ( flag6 && flag8 ){
+        //     agent_j.move = true;
+        //     agent_j.px = agent_j.pbx;
+        //     agent_j.pz = agent_j.pbz;
+        //     agent_j.waitAgent = null;
+        // }
+
+
+
+    }
+
   function collisionConstraint(agent_i,agent_j, i, j, m)
   {
 
@@ -77,9 +206,8 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         agent_j.px += -agent_j_scaler * dir_x;
         agent_j.pz += -agent_j_scaler * dir_z;
 
-
-
     }
+
 
 
 
@@ -195,7 +323,7 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
     // }
 
 
-  function agentVelocityPlannerV2(walls)  {
+  function agentVelocityPlannerV2()  {
 
       // for(let i = 0; i<sceneEntities.length;i++)
     sceneEntities.forEach(function (agent_i) {
@@ -232,13 +360,15 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
             return;
         }
 
-        if (agent_i.index === 13){
-            // console.log();
-        }
+        // if (agent_i.index === 13){
+        //     // console.log();
+        // }
 
         // react detection
-        let t = agent_i.path[agent_i.path_index];
 
+        const goal = agent_i.path[agent_i.path_index];
+
+        let t = {x:goal[0], z:goal[1]};
         if(agent_i.path_index >= agent_i.path.length - 1){
             t = {x:agent_i.goal_x, z:agent_i.goal_z}
         }
@@ -314,6 +444,11 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
           j=i+1;
           while(j<sceneEntities.length)
           {
+
+
+            // following(sceneEntities[i],sceneEntities[j]);
+
+
             collisionConstraint(sceneEntities[i],sceneEntities[j], i, j, matrix)
             j+=1;
           }
@@ -339,6 +474,22 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
 
 
   sceneEntities.forEach(function (item) {
+
+        // console.log(item);
+        // item.agent.material = new THREE.MeshLambertMaterial({
+        //     color: 0x000000
+        // });
+
+
+
+
+
+        // item.agent.material = new THREE.MeshLambertMaterial({
+        //         color: 0xff0000
+        // });
+
+
+
 
 
       item.vx = (item.px-item.x)/timestep;
@@ -366,6 +517,9 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
     {
         item.z= world.z/2;
     }
+
+
+
   });
 
 
