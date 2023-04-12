@@ -403,7 +403,10 @@ let text = {
     right_dist2opening: goal_x_shift,
     opening: opening.length,
     AgentNumber: num_points,
-    Seed:1234
+    Seed:1234,
+    download: function() {
+        alert("clicked!")
+    }
 };
 
 // let myRandomFunction = Math.seed(text.Seed);
@@ -428,6 +431,7 @@ menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function 
     gridization();
     // render();
 });
+menu.add(text, 'download').name('Download');
 
 const customContainer = document.getElementById('my-gui-container');
 customContainer.appendChild(gui.domElement);
@@ -1637,6 +1641,6 @@ window.addEventListener("resize", onWindowResize);
 window.addEventListener("click", mouseDown, false);
 window.addEventListener("mousemove", mouseMove, false);
 window.addEventListener("contextmenu", rightClick, false);
-document.getElementById('download-btn').addEventListener('click', downloadSimData, false);
-render();
+// document.getElementById('download-btn').addEventListener('click', downloadSimData, false);
+// render();
 animate();

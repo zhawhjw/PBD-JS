@@ -1,32 +1,44 @@
 import json
 import pandas as pd
+import os
+
+from warnings import simplefilter
+simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+
+input_path = "downloads/"
+output_path = "converts/"
 
 if __name__ == "__main__":
 
-    f = open("simulation.json")
 
-    data = json.load(f)
+    for root, dirs, files in os.walk(input_path, topdown=True):
 
-    dataframe = pd.DataFrame()
+        for f in files:
 
-    AGENTS = [agent['id'] for agent in data[0]['agents']]
-    # print(AGENTS)
-    dataframe['agentID'] = AGENTS
+            rf = open(root + "/" + f)
 
-    for idx, fr in enumerate(data):
-        frame_index = fr['frame']
-        agents = fr['agents']
+            data = json.load(rf)
 
-        fr_xs = []
-        fr_ys = []
+            dataframe = pd.DataFrame()
 
-        for agent in agents:
-            fr_xs.append(agent['x'])
-            fr_ys.append(agent['y'])
+            AGENTS = [agent['id'] for agent in data[0]['agents']]
+            # print(AGENTS)
+            dataframe['agentID'] = AGENTS
 
-        dataframe[str(idx) + "_x"] = fr_xs
-        dataframe[str(idx) + "_y"] = fr_ys
+            for idx, fr in enumerate(data):
+                frame_index = fr['frame']
+                agents = fr['agents']
 
-        # print(agents)
+                fr_xs = []
+                fr_ys = []
 
-    dataframe.to_csv("sampling_" + str(len(AGENTS)) + "_agent_AStar.csv", header=False, index=False)
+                for agent in agents:
+                    fr_xs.append(agent['x'])
+                    fr_ys.append(agent['y'])
+
+                dataframe[str(idx) + "_x"] = fr_xs
+                dataframe[str(idx) + "_y"] = fr_ys
+
+                # print(agents)
+
+            dataframe.to_csv(output_path + "/" + "sampling_" + str(len(AGENTS)) + "_agent_AStar.csv", header=False, index=False)

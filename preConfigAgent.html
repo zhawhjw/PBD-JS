@@ -5,19 +5,20 @@
     <title>Agent Dynamics Tutorial</title>
 
 
+    <style>
 
+    </style>
 
 
 
 </head>
 
 <body style="margin:0;background:black;text-align:left;">
-<form>
-    <label for="frame">Frame:</label>
-    <input type="number" id="frame" name="frame" value="100" style="float: right;">
+<div id="iframe-goes-in-here">
+    <div id="my-gui-container"></div>
 
-    <button type="button" id="download-btn" value="100" style="float: right;">Download</button>
-</form>
+</div>
+
 
 <script type="importmap">
       {
@@ -29,7 +30,8 @@
         }
       }
     </script>
-
+<script src="//cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js">
+</script>
 <script type="module" src="./js/userControlConfig.js" ></script>
 </body>
 </html>

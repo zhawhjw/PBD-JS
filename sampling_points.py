@@ -9,6 +9,9 @@ import numpy as np
 import pandas as pd
 
 from matplotlib import rcParams
+from warnings import simplefilter
+
+simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
 
 
 # Returns theta in [-pi/2, 3pi/2]
@@ -112,18 +115,44 @@ if __name__ == "__main__":
 
     # which grid (indexed by row x column) is the center of opening
     # picked from JS obstacle configuration
-    center = [20, 21]
-    real_x, real_y = convertGrid2World(center[0], center[1])
+    opening = [
+        [20, 23],
+        [20, 24],
+        [20, 25],
+        [20, 26],
+    ]
+    opening = np.array(opening)
+    opens = opening[:, 1]
+    # print(opens)
+    mx = 20
+
+    if len(opens) == 2:
+        real_x1, real_y1 = convertGrid2World(mx, opens[0])
+        real_x2, real_y2 = convertGrid2World(mx, opens[1])
+        real_x, real_y = (real_x1 + real_x2) / 2, (real_y1 + real_y2) / 2
+
+    elif len(opens) % 2 != 0:
+        mid = len(opens) // 2
+        middle = opens[mid]
+        real_x, real_y = convertGrid2World(mx, middle)
+
+    else:
+        mid1 = len(opens) // 2
+        mid2 = len(opens) // 2 + 1
+        real_x1, real_y1 = convertGrid2World(mx, opens[mid1])
+        real_x2, real_y2 = convertGrid2World(mx, opens[mid2])
+        real_x, real_y = (real_x1 + real_x2) / 2, (real_y1 + real_y2) / 2
+
     print("{} {}".format(real_x, real_y))
 
-    w = 6
-    h = 30
+    w = 10
+    h = 45
     r = 0.4
     particle_distance = r * 2
     epsilon = 0.4
-    num_points = 30
+    num_points = 40
 
-    start_x_shift = 40
+    start_x_shift = 25
     goal_x_shift = 20
 
     # following data
@@ -154,12 +183,13 @@ if __name__ == "__main__":
 
     goals = [[goal_x, real_y - idx * (particle_distance + epsilon)] for idx, (x, y) in enumerate(points)]
 
+
     center_y_of_goals = (goals[0][1] + goals[-1][1]) / 2
 
     delta = abs(real_y - center_y_of_goals)
     goals = [[x, y + delta] for _, (x, y) in enumerate(goals)]
 
-
+    print("Max Y: {}, Min Y: {}".format(max(np.array(goals)[:, 1]), min(np.array(goals)[:, 1])))
 
     # goals = [[goal_x, max(points[:, 1]) - idx * (particle_distance + epsilon)] for idx, (x, y) in enumerate(points)]
 

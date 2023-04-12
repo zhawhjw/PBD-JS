@@ -595,12 +595,8 @@ function init() {
 
                 correction: false,
                 move: true,
-                // fpx :0,
-                // fpz :0,
 
-                cvx :0,
-                cvz :0,
-
+                density: 1,
 
 
             });

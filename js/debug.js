@@ -78,7 +78,7 @@ const tile = {
 }
 
 
-const obstacles = [
+let obstacles = [
     [20, 0],
     [20, 1],
     [20, 2],
@@ -551,6 +551,10 @@ function init() {
     ring.rotation.x = -Math.PI / 2;
     ring.position.y += 0.01;
 
+    function getRandomFloat(n, m) {
+        return Math.random() * (m - n) + n;
+    }
+
     function addColumnAgentGroup(agentData, numAgents, spacing,
                                  startPos, goalPos,
                                  velocityMagnitude, direction) {
@@ -595,11 +599,8 @@ function init() {
                 correction: false,
                 move: true,
                 waitAgent:null,
-                // fpx :0,
-                // fpz :0,
-
-                cvx :0,
-                cvz :0,
+                density: 1,
+                variance: getRandomFloat(0, 0.8),
 
 
 
@@ -644,7 +645,172 @@ function init() {
         });
 
     }
+
+    function hallwayAgentConfiguration(){
+
+        [rows, columns] = cut();
+
+        let fobs = []
+
+
+        let pieces1 = []
+        for (let i = 0; i<rows;i++){
+            pieces1.push([i, 16]);
+        }
+
+        // console.log(pieces1);
+
+
+        let pieces2 = []
+        for (let i = 0; i<rows;i++){
+            pieces2.push([i, 30]);
+        }
+
+        fobs = [...pieces1, ...pieces2];
+        // fobs.push([...pieces2]);
+        // console.log(fobs);
+
+        obstacles = fobs;
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: 1
+            }, {
+                x: -35,
+                z: 1
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: 6
+            }, {
+                x: -35,
+                z: 6
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: -7
+            }, {
+                x: -35,
+                z: -7
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 30,
+                z: -12
+            }, {
+                x: -35,
+                z: -12
+            },
+            0.8, "X", );
+
+
+
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: -30,
+                z: 0
+            }, {
+                x: 35,
+                z: 0
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: -30,
+                z: 5
+            }, {
+                x: 35,
+                z: 5
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: -30,
+                z: -5
+            }, {
+                x: 35,
+                z: -5
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: -30,
+                z: -10
+            }, {
+                x: 35,
+                z: -10
+            },
+            0.8, "X", );
+
+
+    }
+    // hallwayAgentConfiguration();
+
     function defaultAgentConfiguration(){
+
+        obstacles = [
+            [20, 0],
+            [20, 1],
+            [20, 2],
+            [20, 3],
+            [20, 4],
+            [20, 5],
+            [20, 6],
+            [20, 7],
+            [20, 8],
+            [20, 9],
+            [20, 10],
+            [20, 11],
+            [20, 12],
+            [20, 13],
+            [20, 14],
+            [20, 15],
+            [20, 16],
+            [20, 17],
+            [20, 18],
+            [20, 19],
+            // [20, 20],
+
+            // [20, 22],
+            [20, 23],
+            [20, 24],
+            [20, 25],
+            [20, 26],
+            [20, 27],
+            [20, 28],
+            [20, 29],
+            [20, 30],
+            [20, 31],
+            [20, 32],
+            [20, 33],
+            [20, 34],
+            [20, 35],
+            [20, 36],
+            [20, 37],
+            [20, 38],
+            [20, 39],
+            [20, 40],
+            [20, 41],
+            [20, 42],
+            [20, 43],
+            [20, 44],
+            [20, 45],
+            [20, 46],
+            [20, 47],
+            [20, 48],
+            [20, 49],
+
+
+        ]
+
         addColumnAgentGroup(agentData, 4, RADIUS * 4, {
                 x: 30,
                 z: 45

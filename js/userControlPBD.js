@@ -78,7 +78,7 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
     }
 
     const d1 = 0.3;
-    const d2 = 0.3;
+    const d2 = 0.8;
 
     function getUnitVector(vector){
         // Define the 2D vector
@@ -94,6 +94,18 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         };
 
         return unitVector;
+    }
+
+    function normalize(min, max, value) {
+        if (value < min) {
+            return 0;
+        }
+        else if (value > max) {
+            return 1;
+        }
+        else {
+            return (value - min) / (max - min);
+        }
     }
 
     function following(agent_i, agent_j){
@@ -173,45 +185,112 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
 
     }
 
-  function collisionConstraint(agent_i,agent_j, i, j, m)
-  {
-
-    const agentCentroidDist = distance(agent_i.px, agent_i.pz, agent_j.px, agent_j.pz );
-
-    const AgentDist = agentCentroidDist - AGENTSIZE;
-
-    const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, agent_i.goal_x, agent_i.goal_z );
-    const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, agent_j.goal_x, agent_j.goal_z );
-
-    const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
-    const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
 
 
-    let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
-    let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+    function setScalar(follower, followed){
+
+        const activate_dist = d2 + follower.variance;
+
+        const agentCentroidDist = distance(follower.px, follower.pz, followed.px, followed.pz );
+
+        const follower_v = {x: follower.vx, y:follower.vz};
+        const follower_uv = getUnitVector(follower_v);
+
+        const dir = {x: followed.px - follower.px, y:followed.pz - follower.pz};
+        const followed_ud = getUnitVector(dir);
+
+        let flag1 = (agentCentroidDist - 2 * RADIUS) < activate_dist;
+        let flag2 = (degreeBetween(follower_uv, followed_ud) < 60);
 
 
-    if(agentCentroidDist - AGENTSIZE < 0) {
 
-        if (agent_i_goal_distance > agent_j_goal_distance) {
-            agent_j_scaler = agent_j_scaler * 2;
+        if( flag1 && flag2 && !followed.simEnd){
 
-        } else if (agent_i_goal_distance < agent_j_goal_distance) {
-            agent_i_scaler = agent_i_scaler * 2;
+            let delta =  (agentCentroidDist - 2 * RADIUS);
+
+            let scalar = normalize(0, activate_dist, delta);
+
+
+
+            if(scalar < follower.density){
+                follower.density = scalar;
+            }
+
+
+        }else {
+            follower.density = 1;
         }
 
 
-        agent_i.px += agent_i_scaler * dir_x;
-        agent_i.pz += agent_i_scaler * dir_z;
-        agent_j.px += -agent_j_scaler * dir_x;
-        agent_j.pz += -agent_j_scaler * dir_z;
+
+
 
     }
 
+    function followingV2(agent_i, agent_j){
+
+
+        if (agent_i.index === 61 && agent_j.index === 65){
+            console.log("hit")
+        }
+
+        if (agent_i.index === 64 && agent_j.index === 68){
+            console.log("hit")
+        }
+
+        setScalar(agent_i, agent_j);
+        setScalar(agent_j, agent_i);
+
+        agent_i.px = agent_i.x + (agent_i.px - agent_i.x) * agent_i.density;
+        agent_i.pz = agent_i.z + (agent_i.pz - agent_i.z) *  agent_i.density;
+
+        agent_j.px = agent_j.x + (agent_j.px - agent_j.x) * agent_j.density;
+        agent_j.pz = agent_j.z + (agent_j.pz - agent_j.z) *  agent_j.density;
 
 
 
-  }
+
+    }
+
+    function collisionConstraint(agent_i,agent_j, i, j, m)
+    {
+
+        const agentCentroidDist = distance(agent_i.px, agent_i.pz, agent_j.px, agent_j.pz );
+
+        const AgentDist = agentCentroidDist - AGENTSIZE;
+
+        const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, agent_i.goal_x, agent_i.goal_z );
+        const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, agent_j.goal_x, agent_j.goal_z );
+
+        const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
+        const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
+
+
+        let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+        let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+
+
+        if(agentCentroidDist - AGENTSIZE < 0) {
+
+            if (agent_i_goal_distance > agent_j_goal_distance) {
+                agent_j_scaler = agent_j_scaler * 2;
+
+            } else if (agent_i_goal_distance < agent_j_goal_distance) {
+                agent_i_scaler = agent_i_scaler * 2;
+            }
+
+
+            agent_i.px += agent_i_scaler * dir_x;
+            agent_i.pz += agent_i_scaler * dir_z;
+            agent_j.px += -agent_j_scaler * dir_x;
+            agent_j.pz += -agent_j_scaler * dir_z;
+
+        }
+
+
+
+
+    }
 
     function collisionConstraintWithWall(agent_i,wall_j_object, i, j)
     {
@@ -360,18 +439,16 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
             return;
         }
 
-        // if (agent_i.index === 13){
-        //     // console.log();
-        // }
 
         // react detection
 
         const goal = agent_i.path[agent_i.path_index];
 
         let t = {x:goal[0], z:goal[1]};
-        if(agent_i.path_index >= agent_i.path.length - 1){
-            t = {x:agent_i.goal_x, z:agent_i.goal_z}
-        }
+
+        // if(agent_i.path_index >= agent_i.path.length - 1){
+        //     t = {x:agent_i.goal_x, z:agent_i.goal_z}
+        // }
 
         const distToGoal = distance(agent_i.x, agent_i.z,
             t.x, t.z );
@@ -389,10 +466,15 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
             //     console.log(agent_i.index);
             // }
 
+            agent_i.goal_x = t.x;
+            agent_i.goal_z = t.z;
+
             const dir_x = (t.x - agent_i.x)/distToGoal;
             const dir_z = (t.z - agent_i.z)/distToGoal;
             agent_i.vx = agent_i.v_pref * dir_x;
             agent_i.vz = agent_i.v_pref * dir_z;
+
+
 
 
         }
@@ -441,16 +523,21 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
       i=0;
       while(i<sceneEntities.length)
       {
+
+
+
           j=i+1;
+
           while(j<sceneEntities.length)
           {
 
 
-            // following(sceneEntities[i],sceneEntities[j]);
+              // following(sceneEntities[i],sceneEntities[j]);
+                followingV2(sceneEntities[i], sceneEntities[j]);
 
+                collisionConstraint(sceneEntities[i],sceneEntities[j], i, j, matrix);
 
-            collisionConstraint(sceneEntities[i],sceneEntities[j], i, j, matrix)
-            j+=1;
+                j+=1;
           }
           i+=1
       }
