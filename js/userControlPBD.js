@@ -1,10 +1,149 @@
-import * as THREE from 'three';
+function getPerpendicularPoints(A, B, R) {
+
+    const perpVector = [-A[1], A[0]];
+    const perpUnitVector = perpVector.map(v => v / Math.sqrt(perpVector[0] * perpVector[0] + perpVector[1] * perpVector[1]));
+
+
+    const point1 = [B[0] + perpUnitVector[0] * R, B[1] + perpUnitVector[1] * R];
+    const point2 = [B[0] - perpUnitVector[0] * R, B[1] - perpUnitVector[1] * R];
+
+    return [point1, point2];
+}
+
+function isProjectedPointBetweenPoints(pointC, pointA, pointB) {
+
+    const vectorAB = [pointB[0] - pointA[0], pointB[1] - pointA[1]];
+
+
+    const vectorAC = [pointC[0] - pointA[0], pointC[1] - pointA[1]];
+
+
+    const projection = [
+        (vectorAC[0] * vectorAB[0] + vectorAC[1] * vectorAB[1]) / (vectorAB[0] * vectorAB[0] + vectorAB[1] * vectorAB[1]) * vectorAB[0],
+        (vectorAC[0] * vectorAB[0] + vectorAC[1] * vectorAB[1]) / (vectorAB[0] * vectorAB[0] + vectorAB[1] * vectorAB[1]) * vectorAB[1]
+    ];
+
+
+    const pointP = [pointA[0] + projection[0], pointA[1] + projection[1]];
+
+
+    const isBetweenPoints = (
+        (pointP[0] >= pointA[0] && pointP[0] <= pointB[0] || pointP[0] >= pointB[0] && pointP[0] <= pointA[0]) &&
+        (pointP[1] >= pointA[1] && pointP[1] <= pointB[1] || pointP[1] >= pointB[1] && pointP[1] <= pointA[1])
+    );
+
+    return isBetweenPoints;
+}
+
+function pDistance(x, y, x1, y1, x2, y2) {
+
+    var A = x - x1;
+    var B = y - y1;
+    var C = x2 - x1;
+    var D = y2 - y1;
+
+    var dot = A * C + B * D;
+    var len_sq = C * C + D * D;
+    var param = -1;
+    if (len_sq != 0) //in case of 0 length line
+        param = dot / len_sq;
+
+    var xx, yy;
+
+    if (param < 0) {
+        xx = x1;
+        yy = y1;
+    }
+    else if (param > 1) {
+        xx = x2;
+        yy = y2;
+    }
+    else {
+        xx = x1 + param * C;
+        yy = y1 + param * D;
+    }
+
+    var dx = x - xx;
+    var dy = y - yy;
+    return Math.sqrt(dx * dx + dy * dy);
+}
+
+function calculatePerpendicularDistanceToPoint(pointP, pointA, pointB) {
+
+    const vectorAB = [pointB[0] - pointA[0], pointB[1] - pointA[1]];
+
+
+    const vectorAP = [pointP[0] - pointA[0], pointP[1] - pointA[1]];
+
+
+    const projection = [
+        (vectorAP[0] * vectorAB[0] + vectorAP[1] * vectorAB[1]) / (vectorAB[0] * vectorAB[0] + vectorAB[1] * vectorAB[1]) * vectorAB[0],
+        (vectorAP[0] * vectorAB[0] + vectorAP[1] * vectorAB[1]) / (vectorAB[0] * vectorAB[0] + vectorAB[1] * vectorAB[1]) * vectorAB[1]
+    ];
+
+    // const r =
+
+
+    // const p = [projection[0] + pointA[0], projection[1] + pointB[1]];
+    const distance = Math.sqrt(Math.pow(vectorAP[0] - projection[0], 2) + Math.pow(vectorAP[1] - projection[1], 2));
+    // const d = distance(p[0], p[1], pointP[0], pointP[1]);
+
+    return distance;
+}
+
+
+function blockedVision(maxVision, velocity, left_pole, right_pole, other_left_pole, other_right_pole){
+    // const velocity = [0, 1];
+    // const center = [0, 0];
+    // const R = 2;
+
+    // const [point1, point2] = getPerpendicularPoints(velocity, center, maxVision);
+    // const left_pole = point1;
+    // const right_pole = point2;
+
+    // const other_left_pole = [1, 1];
+    // const other_right_pole = [4.1, 4.1];
+
+    const isLeft = isProjectedPointBetweenPoints(other_left_pole, left_pole, right_pole);
+    const isRight = isProjectedPointBetweenPoints(other_right_pole, left_pole, right_pole);
+
+
+    if(isLeft && isRight){
+        return maxVision;
+    }else if(isLeft){
+        // return pDistance(other_left_pole[0], other_left_pole[1], right_pole[0], right_pole[1], right_pole[0] + velocity[0], right_pole[1] + velocity[1]);
+        return calculatePerpendicularDistanceToPoint(other_left_pole, right_pole, [right_pole[0] + velocity[0], right_pole[1] + velocity[1]]);
+    }else if (isRight){
+        // return pDistance(other_right_pole[0], other_right_pole[1], left_pole[0], left_pole[1], left_pole[0] + velocity[0], left_pole[1] + velocity[1]);
+        return calculatePerpendicularDistanceToPoint(other_right_pole, left_pole, [left_pole[0] + velocity[0], left_pole[1] + velocity[1]]);
+    }else {
+        return 0;
+    }
+}
+
+// console.log(isBetweenPoints); // Output: true
+
+
+//
+// const point = [1, 0];
+// const vector1 = [0, 1];
+// const vector2 = [2, 2];
+// const r = Math.sqrt(2);
+//
+// const isBetweenVectors = isPointBetweenVectors(point, vector1, vector2, r);
+//
+// console.log(isBetweenVectors); // Output: true
+
+
+
 
 export function distance(x1, y1, x2, y2) {
-      return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
+    return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
 
 export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities, WORLDUNIT, matrix) {
+
+
 
     // console.log(matrix);
   /*  -----------------------  */
@@ -108,86 +247,38 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         }
     }
 
-    function following(agent_i, agent_j){
-
-        if (agent_j.simEnd === true){
-            agent_j.waitAgent = null;
-            return;
-        }
-
-        const agentCentroidDist = distance(agent_i.px, agent_i.pz, agent_j.px, agent_j.pz );
-        // const agent_i_v = {x: agent_i.vx, y:agent_i.vz};
-        const agent_j_v = {x: agent_j.vx, y:agent_j.vz};
-
-        // const agent_i_uv = getUnitVector(agent_i_v);
-        const agent_j_uv = getUnitVector(agent_j_v);
-
-        // const dir_i2j = {x: agent_j.px- agent_i.px, y:agent_j.pz- agent_i.pz};
-        const dir_j2i = {x: agent_i.px - agent_j.px, y:agent_i.pz - agent_j.pz};
-
-        const flag1 = (agent_j.move === true);
-        const flag2 = ((agentCentroidDist - 2 * RADIUS) < d2);
-        const flag3 = (degreeBetween(agent_j_uv, dir_j2i) < 30);
-
-        const flag4 = (agent_j.move === false);
-        const flag5 = ((agentCentroidDist - 2 * RADIUS) > (d1 + d2));
-        const flag6 = (agent_j.waitAgent === agent_i.index);
-
-        if (agent_i.index === 49 && agent_j.index === 60  || (agent_i.index === 60 && agent_j.index === 49)){
-
-            if (agent_j.px === agent_j.x || agent_j.pz === agent_j.z){
-                console.log("hit1");
-            }
-
-            if (agent_i.px === agent_i.x || agent_i.pz === agent_i.z){
-                console.log("hit2");
-            }
-
-        }
-
-        if (!agent_j.move){
-            agent_j.px = agent_j.x;
-            agent_j.pz = agent_j.z;
-        }
-
-
-        if ( flag1 && flag2 && flag3){
-            agent_j.move = false;
-            agent_j.pbx = agent_j.px;
-            agent_j.pbz = agent_j.pz;
-            agent_j.waitAgent = agent_i.index;
-
-        }
-
-        // if reactive
-        if ( (flag4 && flag5 && flag6)){
-            agent_j.move = true;
-            agent_j.px = agent_j.pbx;
-            agent_j.pz = agent_j.pbz;
-            agent_j.waitAgent = null;
-        }
-
-        const flag7 = (agent_j.waitAgent === agent_i.index) && (agent_i.waitAgent === agent_j.index);
-        // const flag8 = (agent_i.simEnd);
-
-        // if deadlock
-
-
-        // if i reaches goal
-        // if ( flag6 && flag8 ){
-        //     agent_j.move = true;
-        //     agent_j.px = agent_j.pbx;
-        //     agent_j.pz = agent_j.pbz;
-        //     agent_j.waitAgent = null;
-        // }
-
-
-
-    }
 
 
 
     function setScalar(follower, followed){
+
+        // if(follower.exit === null || follower.path === null){
+        //     return;
+        // }
+        //
+        // let keypoint = follower.path[follower.key_index];
+        // let direction = [keypoint[0] - follower.x, keypoint[1] - follower.z];
+        //
+        //
+        // let itself = {vx: follower.vx, vz:follower.vz};
+        // if (follower.vx ===0 && follower.vz ===0){
+        //     itself.vx = direction[0];
+        //     itself.vz = direction[1];
+        //
+        // }
+        // const [right_pole, left_pole] = getPerpendicularPoints([itself.vx, itself.vz], [follower.x, follower.z],  RADIUS);
+        //
+        //
+        //
+        // let other = {vx: followed.vx, vz:followed.vz};
+        // if (followed.vx ===0 && followed.vz ===0){
+        //     other.vx = direction[0];
+        //     other.vz = direction[1];
+        //
+        // }
+        // const [other_right_pole, other_left_pole] = getPerpendicularPoints([other.vx, other.vz], [followed.x, followed.z],  RADIUS);
+
+
 
         const activate_dist = d2 + follower.variance;
 
@@ -199,44 +290,47 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         const dir = {x: followed.px - follower.px, y:followed.pz - follower.pz};
         const followed_ud = getUnitVector(dir);
 
-        let flag1 = (agentCentroidDist - 2 * RADIUS) < activate_dist;
-        let flag2 = (degreeBetween(follower_uv, followed_ud) < 60);
+        const followed_v = {x: followed.vx, y:followed.vz};
+        const followed_uv = getUnitVector(followed_v);
+
+        let flag1 = (agentCentroidDist - 2 * RADIUS) < activate_dist; // censor distance range
+        let flag2 = (degreeBetween(follower_uv, followed_ud) < 30); // censor angle range
+        let flag3 = (degreeBetween(follower_uv, followed_uv) > 90); // to solve face to face condition
+        let flag4 = followed.simEnd; // to make sure agent can move if front agent ends the simulation
 
 
-
-        if( flag1 && flag2 && !followed.simEnd){
+        if( flag1 && flag2 && !flag3 && !flag4){
 
             let delta =  (agentCentroidDist - 2 * RADIUS);
 
             let scalar = normalize(0, activate_dist, delta);
 
-
-
             if(scalar < follower.density){
                 follower.density = scalar;
             }
 
+            if (follower.index === 0){
+                console.log();
+            }
+
+            // const blocked = blockedVision(2* RADIUS, [itself.vx, itself.vz], left_pole, right_pole, other_left_pole, other_right_pole);
+            // console.log(blocked);
+
+            // if (blocked <= RADIUS){
+            //     follower.density = 1;
+            // }
+
 
         }else {
             follower.density = 1;
+
         }
-
-
-
 
 
     }
 
     function followingV2(agent_i, agent_j){
 
-
-        if (agent_i.index === 61 && agent_j.index === 65){
-            console.log("hit")
-        }
-
-        if (agent_i.index === 64 && agent_j.index === 68){
-            console.log("hit")
-        }
 
         setScalar(agent_i, agent_j);
         setScalar(agent_j, agent_i);
@@ -272,18 +366,44 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
 
         if(agentCentroidDist - AGENTSIZE < 0) {
 
-            if (agent_i_goal_distance > agent_j_goal_distance) {
-                agent_j_scaler = agent_j_scaler * 2;
-
-            } else if (agent_i_goal_distance < agent_j_goal_distance) {
-                agent_i_scaler = agent_i_scaler * 2;
+            if(agent_j.index === 5){
+                console.log();
             }
 
+            if (agent_i_goal_distance > agent_j_goal_distance) {
+                agent_i_scaler = agent_i_scaler * 2;
+
+            } else if (agent_i_goal_distance < agent_j_goal_distance) {
+                agent_j_scaler = agent_j_scaler * 2;
+            }
+
+
+            const agent_i_pre_px = agent_i.px;
+            const agent_i_pre_pz = agent_i.pz;
+            const agent_j_pre_px = agent_j.px;
+            const agent_j_pre_pz = agent_j.pz;
 
             agent_i.px += agent_i_scaler * dir_x;
             agent_i.pz += agent_i_scaler * dir_z;
             agent_j.px += -agent_j_scaler * dir_x;
             agent_j.pz += -agent_j_scaler * dir_z;
+
+            // if (agent_j.simEnd) {
+            //     agent_i.px += agent_j_scaler * dir_x;
+            //     agent_i.pz += agent_j_scaler * dir_z;
+            //     agent_j.px = agent_j_pre_px;
+            //     agent_j.pz = agent_j_pre_pz;
+            // }
+            //
+            //
+            // if (agent_i.simEnd) {
+            //     agent_i.px = agent_i_pre_px;
+            //     agent_i.pz = agent_i_pre_pz;
+            //     agent_j.px += -agent_i_scaler * dir_x;
+            //     agent_j.pz += -agent_i_scaler * dir_z;
+            // }
+
+
 
         }
 
@@ -312,8 +432,6 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
             agent_i.px += agent_i_scaler * dir_x + wall_j_scaler * dir_x;
             agent_i.pz += agent_i_scaler * dir_z + wall_j_scaler * dir_z;
 
-        }else {
-            // agent_i.collidewall[j] = false;
         }
 
 
@@ -417,12 +535,13 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
                 agent_i.vz = 0;
 
                 agent_i.simEnd = true;
+                agent_i.modifier = 0.2;
 
             }else {
                 const dir_x = (agent_i.goal_x- agent_i.x)/distToGoal;
                 const dir_z = (agent_i.goal_z- agent_i.z)/distToGoal;
-                agent_i.vx = agent_i.v_pref * dir_x;
-                agent_i.vz = agent_i.v_pref * dir_z;
+                agent_i.vx =  agent_i.modifier * agent_i.v_pref * dir_x;
+                agent_i.vz = agent_i.modifier * agent_i.v_pref * dir_z;
 
             }
 
@@ -444,11 +563,10 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
 
         const goal = agent_i.path[agent_i.path_index];
 
+
+
         let t = {x:goal[0], z:goal[1]};
 
-        // if(agent_i.path_index >= agent_i.path.length - 1){
-        //     t = {x:agent_i.goal_x, z:agent_i.goal_z}
-        // }
 
         const distToGoal = distance(agent_i.x, agent_i.z,
             t.x, t.z );
@@ -459,13 +577,8 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
         if(  isOverlapping({x:agent_i.x, y:agent_i.z, radius: agent_i.radius}, {x: t.x, y:t.z, side: 0.25 }))
         {
             agent_i.path_index ++;
+
         }else{
-
-            // if(agent_i.vx === 0 && agent_i.vz === 0 && !agent_i.correction && agent_i.collidewall.includes(true)){
-            //     // agent_i.path_index--;
-            //     console.log(agent_i.index);
-            // }
-
             agent_i.goal_x = t.x;
             agent_i.goal_z = t.z;
 
@@ -474,10 +587,32 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
             agent_i.vx = agent_i.v_pref * dir_x;
             agent_i.vz = agent_i.v_pref * dir_z;
 
-
-
-
         }
+
+        if (agent_i.path_index > agent_i.key_index){
+            let nexit = agent_i.exit;
+            agent_i.key_index = nexit.shift();
+            agent_i.exit = nexit;
+        }
+
+
+        // if (agent_i.exit_index > agent_i.exit.length - 1){
+        //     return;
+        // }
+        //
+        // const farthest_waypoint = agent_i.exit[agent_i.exit_index];
+        // // if (farthest_waypoint === undefined){
+        // //     console.log(farthest_waypoint);
+        // //
+        // // }
+        // if(  isOverlapping({x:agent_i.x, y:agent_i.z, radius: agent_i.radius}, {x: farthest_waypoint.x, y:farthest_waypoint.z, side: 0.25 }))
+        // {
+        //
+        //     agent_i.exit_current = farthest_waypoint;
+        //     agent_i.exit_index ++;
+        //
+        // }
+
 
 
         // agent_i.vx = 0.9999*agent_i.vx;
@@ -532,10 +667,11 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
           {
 
 
-              // following(sceneEntities[i],sceneEntities[j]);
+
+                // following(sceneEntities[i],sceneEntities[j]);
                 followingV2(sceneEntities[i], sceneEntities[j]);
 
-                collisionConstraint(sceneEntities[i],sceneEntities[j], i, j, matrix);
+                collisionConstraint(sceneEntities[i],sceneEntities[j]);
 
                 j+=1;
           }
@@ -562,18 +698,6 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
 
   sceneEntities.forEach(function (item) {
 
-        // console.log(item);
-        // item.agent.material = new THREE.MeshLambertMaterial({
-        //     color: 0x000000
-        // });
-
-
-
-
-
-        // item.agent.material = new THREE.MeshLambertMaterial({
-        //         color: 0xff0000
-        // });
 
 
 
@@ -583,6 +707,8 @@ export function step(RADIUS,sceneEntities,obstacleEntities, world, wallEntities,
       item.vz = (item.pz-item.z)/timestep;
       item.vy = (item.py-item.y)/timestep;
 
+      item.vm = Math.sqrt(item.vx * item.vx + item.vz * item.vz);
+      // console.log(item.vm);
       item.x = item.px;
       item.z = item.pz;
       item.y = item.py;

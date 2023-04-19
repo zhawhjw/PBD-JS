@@ -49,6 +49,9 @@ let pickableWalkingTiles = [];
 let pickableWall = [];
 let texts = [];
 let arrows = [];
+let g_arrows = [];
+
+
 let tiles = [];
 
 let selected = null;
@@ -196,13 +199,13 @@ function AStar(ts, start, end) {
             smoothedPath.push(path[pointer-1]);
 
 
-            let smoothedPathV2 = samplePointsBetweenPoints(smoothedPath, 5);
+            let [smoothedPathV2, smoothIndices] = samplePointsBetweenPoints(smoothedPath, 5);
 
 
 
 
 
-            return [smoothedPath, smoothedPathV2];
+            return [smoothedPath, smoothedPathV2, smoothIndices];
         }
 
         // place picked tile from unvisited set to visited set
@@ -459,7 +462,7 @@ function gridization(){
 }
 
 
-const FT = F.fontConfiguration();
+
 
 function init() {
     // renderer
@@ -551,9 +554,22 @@ function init() {
     ring.rotation.x = -Math.PI / 2;
     ring.position.y += 0.01;
 
-    function getRandomFloat(n, m) {
-        return Math.random() * (m - n) + n;
+    function getRandomFloat(min, max, decimals) {
+        const str = (Math.random() * (max - min) + min).toFixed(decimals);
+
+        return parseFloat(str);
     }
+
+    function removeArrayFrom2DArray(A, specificArray) {
+        for (let i = 0; i < A.length; i++) {
+            if (A[i][0] === specificArray[0] && A[i][1] === specificArray[1]) {
+                A.splice(i, 1);
+                break;
+            }
+        }
+        return A;
+    }
+
 
     function addColumnAgentGroup(agentData, numAgents, spacing,
                                  startPos, goalPos,
@@ -586,13 +602,16 @@ function init() {
                 vx: vx,
                 vy: 0.0,
                 vz: vz,
-                v_pref: Math.sqrt(vx * vx + vz * vz),
+                v_pref: velocityMagnitude,
                 radius: RADIUS,
                 invmass: 0.5,
                 group_id: 1,
 
                 path : null,
                 path_index: 0,
+                exit: null,
+                exit_current: null,
+                exit_index: 1,
 
                 simEnd:null,
 
@@ -600,7 +619,13 @@ function init() {
                 move: true,
                 waitAgent:null,
                 density: 1,
-                variance: getRandomFloat(0, 0.8),
+
+                modifier:1,
+
+                vm: Math.sqrt(vx * vx + vz * vz),
+
+                variance: getRandomFloat(0.5, 1.5, 1),
+
 
 
 
@@ -632,7 +657,7 @@ function init() {
             vx: vx,
             vy: 0.0,
             vz: vz,
-            v_pref: Math.sqrt(vx * vx + vz * vz),
+            v_pref: velocityMagnitude,
             radius: RADIUS,
             invmass: 0.5,
             group_id: 1,
@@ -655,6 +680,384 @@ function init() {
 
         let pieces1 = []
         for (let i = 0; i<rows;i++){
+            pieces1.push([i, 10]);
+        }
+
+        // console.log(pieces1);
+
+
+        let pieces2 = []
+        for (let i = 0; i<rows;i++){
+            pieces2.push([i, 40]);
+        }
+
+        fobs = [...pieces1, ...pieces2];
+        // fobs.push([...pieces2]);
+        // console.log(fobs);
+
+        obstacles = fobs;
+
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -26
+            }, {
+                x: 30,
+                z: -26
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -23
+            }, {
+                x: 30,
+                z: -23
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -20
+            }, {
+                x: 30,
+                z: -20
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -17
+            }, {
+                x: 30,
+                z: -17
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -14
+            }, {
+                x: 30,
+                z: -14
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -11
+            }, {
+                x: 30,
+                z: -11
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -8
+            }, {
+                x: 30,
+                z: -8
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -5
+            }, {
+                x: 30,
+                z: -5
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: -2
+            }, {
+                x: 30,
+                z: -2
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 1
+            }, {
+                x: 30,
+                z: 1
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 4
+            }, {
+                x: 30,
+                z: 4
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 7
+            }, {
+                x: 30,
+                z: 7
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 10
+            }, {
+                x: 30,
+                z: 10
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 13
+            }, {
+                x: 30,
+                z: 13
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 16
+            }, {
+                x: 30,
+                z: 16
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 19
+            }, {
+                x: 30,
+                z: 19
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 22
+            }, {
+                x: 30,
+                z: 22
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 25
+            }, {
+                x: 30,
+                z: 25
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: -45,
+                z: 28
+            }, {
+                x: 25,
+                z: 28
+            },
+            0.8, "X", );
+
+
+
+        // to left
+
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 28
+            }, {
+                x: -45,
+                z: 28
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 25
+            }, {
+                x: -45,
+                z: 25
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 22
+            }, {
+                x: -45,
+                z: 22
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 19
+            }, {
+                x: -45,
+                z: 19
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 16
+            }, {
+                x: -45,
+                z: 16
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 13
+            }, {
+                x: -45,
+                z: 13
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 10
+            }, {
+                x: -45,
+                z: 10
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 7
+            }, {
+                x: -45,
+                z: 7
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 4
+            }, {
+                x: -45,
+                z: 4
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: 1
+            }, {
+                x: -45,
+                z: 1
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -2
+            }, {
+                x: -45,
+                z: -2
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -5
+            }, {
+                x: -45,
+                z: -5
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -8
+            }, {
+                x: -45,
+                z: -8
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -11
+            }, {
+                x: -45,
+                z: -11
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -14
+            }, {
+                x: -45,
+                z: -14
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -17
+            }, {
+                x: -45,
+                z: -17
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -20
+            }, {
+                x: -45,
+                z: -20
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -23
+            }, {
+                x: -45,
+                z: -23
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 6, RADIUS * 4, {
+                x: 25,
+                z: -26
+            }, {
+                x: -45,
+                z: -26
+            },
+            0.8, "X", );
+    }
+
+    function singleHallwayAgentConfiguration(){
+
+        [rows, columns] = cut();
+
+        let fobs = []
+
+
+        let pieces1 = []
+        for (let i = 0; i<rows;i++){
             pieces1.push([i, 16]);
         }
 
@@ -666,7 +1069,26 @@ function init() {
             pieces2.push([i, 30]);
         }
 
-        fobs = [...pieces1, ...pieces2];
+        let pieces3 = []
+        pieces3.push([20, 15])
+        pieces3.push([20, 16])
+        pieces3.push([20, 17])
+        pieces3.push([20, 18])
+        pieces3.push([20, 19])
+        pieces3.push([20, 20])
+        // pieces3.push([20, 21])
+        // pieces3.push([20, 22])
+        pieces3.push([20, 23])
+        pieces3.push([20, 24])
+        pieces3.push([20, 25])
+        pieces3.push([20, 26])
+        pieces3.push([20, 27])
+        pieces3.push([20, 28])
+        pieces3.push([20, 29])
+
+
+
+        fobs = [...pieces1, ...pieces2, ...pieces3];
         // fobs.push([...pieces2]);
         // console.log(fobs);
 
@@ -752,7 +1174,6 @@ function init() {
 
 
     }
-    // hallwayAgentConfiguration();
 
     function defaultAgentConfiguration(){
 
@@ -982,8 +1403,233 @@ function init() {
             },
             0.8, "X", );
     }
-    defaultAgentConfiguration();
 
+    function debugConfiguration(){
+
+        obstacles = [
+            [20, 0],
+            [20, 1],
+            [20, 2],
+            [20, 3],
+            [20, 4],
+            [20, 5],
+            [20, 6],
+            [20, 7],
+            [20, 8],
+            [20, 9],
+            [20, 10],
+            [20, 11],
+            [20, 12],
+            [20, 13],
+            [20, 14],
+            [20, 15],
+            [20, 16],
+            [20, 17],
+            [20, 18],
+            [20, 19],
+            // [20, 20],
+
+            // [20, 22],
+            [20, 23],
+            [20, 24],
+            [20, 25],
+            [20, 26],
+            [20, 27],
+            [20, 28],
+            [20, 29],
+            [20, 30],
+            [20, 31],
+            [20, 32],
+            [20, 33],
+            [20, 34],
+            [20, 35],
+            [20, 36],
+            [20, 37],
+            [20, 38],
+            [20, 39],
+            [20, 40],
+            [20, 41],
+            [20, 42],
+            [20, 43],
+            [20, 44],
+            [20, 45],
+            [20, 46],
+            [20, 47],
+            [20, 48],
+            [20, 49],
+
+
+        ]
+
+        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+                x: 25,
+                z: -5
+            }, {
+                x: -35,
+                z: -5
+            },
+            0.8, "X", );
+
+
+        addColumnAgentGroup(agentData, 1, RADIUS * 4, {
+                x: -5,
+                z: -8
+            }, {
+                x: -5,
+                z: -8
+            },
+            0.8, "X", );
+
+        addColumnAgentGroup(agentData, 1, RADIUS * 4, {
+                x: -5,
+                z: -4
+            }, {
+                x: -5,
+                z: -4
+            },
+            0.8, "X", );
+
+
+    }
+
+    function lineupConfiguration(){
+
+        [rows, columns] = cut();
+
+        let fobs = []
+
+        // obstacles
+        let pieces1 = []
+        for (let j =15;j<30;j++){
+            for (let i = 0; i<rows;i++){
+                pieces1.push([i, j]);
+            }
+        }
+
+        let counter = 1;
+        for (let j = 1; j<50;j+=4){
+
+            for (let i = 16;i<30 - 1;i++){
+                pieces1 = removeArrayFrom2DArray(pieces1, [j, i]);
+            }
+
+            if (counter % 2 === 0){
+                for (let i = 16; i < 16 + 2; i++){
+                    pieces1 = removeArrayFrom2DArray(pieces1, [j+2, i]);
+
+                }
+
+            }else {
+                for (let i = 27; i < 30 - 1; i++){
+                    pieces1 = removeArrayFrom2DArray(pieces1, [j+2, i]);
+
+                }
+
+            }
+
+
+            counter++;
+
+        }
+
+        counter = 1;
+        for (let j = 2; j<50;j+=4){
+            for (let i = 16;i<30 - 1;i++){
+                pieces1 = removeArrayFrom2DArray(pieces1, [j, i]);
+            }
+
+            if (counter % 2 === 0){
+                for (let i = 16; i < 16 + 2; i++){
+                    pieces1 = removeArrayFrom2DArray(pieces1, [j+2, i]);
+
+                }
+
+            }else {
+                for (let i = 27; i < 30 - 1; i++){
+                    pieces1 = removeArrayFrom2DArray(pieces1, [j+2, i]);
+
+                }
+
+            }
+
+            counter++;
+        }
+
+        pieces1 = removeArrayFrom2DArray(pieces1, [43, 29]);
+        pieces1 = removeArrayFrom2DArray(pieces1, [44, 29]);
+
+        fobs = [...pieces1];
+
+        obstacles = fobs;
+
+
+        for (let i = -46; i< 42; i+=8){
+            for (let j = -16;j< 6 + 2; j+=4){
+                addColumnAgentGroup(agentData, 1, 0, {
+                        x: i,
+                        z: j
+                    }, {
+                        x: i,
+                        z: j + 32
+                    },
+                    0.8, "X", );
+
+
+                // addColumnAgentGroup(agentData, 1, 0, {
+                //         x: i,
+                //         z: j+32
+                //     }, {
+                //         x: i,
+                //         z: j+32
+                //     },
+                //     0.8, "X", );
+            }
+
+        }
+
+        counter = 1;
+
+        for (let i = -42; i< 42; i+=8){
+
+            if (counter % 2 ===0){
+                addColumnAgentGroup(agentData, 1, 0, {
+                        x: i,
+                        z: -16
+                    }, {
+                        x: i,
+                        z: -16 + 32
+                    },
+                    0.8, "X", );
+            }else {
+                addColumnAgentGroup(agentData, 1, 0, {
+                        x: i,
+                        z: 6
+                    }, {
+                        x: i,
+                        z: 6 + 32
+                    },
+                    0.8, "X", );
+            }
+
+
+
+            counter++;
+
+        }
+
+
+
+
+
+
+
+    }
+
+    // debugConfiguration();
+    hallwayAgentConfiguration();
+    // singleHallwayAgentConfiguration();
+    // defaultAgentConfiguration();
+    // lineupConfiguration();
 
 
     function loadFromAgentData(){
@@ -997,13 +1643,13 @@ function init() {
 
 
 
-    let i = 0;
-    let deltaSpacing = 3;
-    let startX, startY, goalX, goalY;
-    startX = -25;
-    goalX = -25;
-    startY = -20
-    goalY = 20;
+    // let i = 0;
+    // let deltaSpacing = 3;
+    // let startX, startY, goalX, goalY;
+    // startX = -25;
+    // goalX = -25;
+    // startY = -20
+    // goalY = 20;
     world.distanceConstraints = [];
 
 
@@ -1011,14 +1657,14 @@ function init() {
 
 
     let agentGeom, agentMaterial, agent;
-    let spotLight, spotLightTarget;
+    // let spotLight, spotLightTarget;
 
     agentData.forEach(function(item, index) {
 
 
         agentGeom = new THREE.CylinderGeometry(item.radius, item.radius, 4, 16);
         agentMaterial = new THREE.MeshLambertMaterial({
-            color: 0x00ff00
+            color: 0xff0000
         });
 
         agent = new THREE.Mesh(agentGeom, agentMaterial);
@@ -1053,16 +1699,26 @@ function init() {
 
         });
 
-
+        // velocity indicator
         let dir = new THREE.Vector3( 1, 0, 0 );
         let origin = agent.position;
         let length = 5;
         let hex = 0xffff00;
 
         let arrowHelper = new THREE.ArrowHelper( dir, origin, length, hex );
-        // arrowHelper.dir
         scene.add( arrowHelper );
         arrows.push(arrowHelper);
+
+        // goal indicator
+        let g_dir = new THREE.Vector3( 1, 0, 0 );
+        let g_origin = agent.position;
+        let g_length = 5;
+        let g_hex = 0x0000ff;
+
+        let g_arrowHelper = new THREE.ArrowHelper( g_dir, g_origin, g_length, g_hex );
+        scene.add( g_arrowHelper );
+        g_arrows.push(g_arrowHelper);
+
 
 
 
@@ -1125,6 +1781,7 @@ function downloadSimData() {
 function samplePointsBetweenPoints(points, m) {
     // Initialize an array to store the sampled points
     const sampledPoints = [];
+    const keyIndices = [];
 
     // Iterate through the array of points
     for (let i = 0; i < points.length - 1; i++) {
@@ -1135,7 +1792,9 @@ function samplePointsBetweenPoints(points, m) {
         const [x1, y1] = [point1.x, point1.z];
         const [x2, y2] = [point2.x, point2.z];
 
-        sampledPoints.push([x1, y1]);
+        let key_index = sampledPoints.push([x1, y1]) - 1;
+        keyIndices.push(key_index);
+
 
         // Generate m points between point1 and point2
         for (let j = 1; j <= m; j++) {
@@ -1151,9 +1810,10 @@ function samplePointsBetweenPoints(points, m) {
     const endPoint = points[points.length-1];
     const [ex1, ey1] = [endPoint.x, endPoint.z];
     sampledPoints.push([ex1, ey1]);
+    keyIndices.push(sampledPoints.length-1);
 
     // Return the array of sampled points
-    return sampledPoints;
+    return [sampledPoints, keyIndices];
 }
 
 
@@ -1269,7 +1929,7 @@ function rightClick(event) {
 
 
 
-        const [path, smoothPath] = AStar(tiles, selectedObject.userData.start_tile, selectedObject.userData.end_tile);
+        const [path, smoothPath, smoothIndices] = AStar(tiles, selectedObject.userData.start_tile, selectedObject.userData.end_tile);
 
         // let copy_path = deepCloneArray(path);
 
@@ -1282,8 +1942,14 @@ function rightClick(event) {
 
         // console.log(copy_path);
 
+        let firstKeyIndex = smoothIndices.shift();
+
         agentData[selected].path = smoothPath;
         agentData[selected].path_index = 0;
+
+        agentData[selected].exit = smoothIndices;
+        agentData[selected].key_index = firstKeyIndex;
+
         agentData[selected].simEnd = false;
     }
 
@@ -1327,6 +1993,18 @@ function getUnitVector(vector){
     return unitVector;
 }
 
+function setMeshColor(mesh, value) {
+    // Calculate the color value between red and blue
+    const r = Math.round(value * 255);
+    const g = Math.round((1 - value) * 255);
+
+    // Create a new color with the calculated RGB values
+    const color = new THREE.Color(`rgb(${r}, ${g}, 0)`);
+
+    // Set the color of the mesh
+    mesh.material.color = color;
+}
+
 
 
 function render() {
@@ -1334,7 +2012,17 @@ function render() {
 }
 
 
-
+function normalize(min, max, value) {
+    if (value < min) {
+        return 0;
+    }
+    else if (value > max) {
+        return 1;
+    }
+    else {
+        return (value - min) / (max - min);
+    }
+}
 
 function animate() {
     requestAnimationFrame(animate);
@@ -1358,7 +2046,9 @@ function animate() {
         member.agent.position.x = member.x;
         member.agent.position.y = member.y;
         member.agent.position.z = member.z;
-        member.agent.material = redAgentMaterial;
+        // member.agent.material = redAgentMaterial;
+
+        setMeshColor(member.agent, normalize(0, member.v_pref, member.vm));
 
         if (texts.length>0){
             texts[index].position.x = member.x;
@@ -1368,8 +2058,8 @@ function animate() {
 
         if (arrows.length>0){
 
-            let newSourcePos = member.agent.position;
-            let newTargetPos = new THREE.Vector3(member.x, member.y, member.z);
+            // let newSourcePos = member.agent.position;
+            // let newTargetPos = new THREE.Vector3(member.x, member.y, member.z);
 
             arrows[index].position.x = member.x;
             arrows[index].position.y = member.y;
@@ -1383,9 +2073,31 @@ function animate() {
             arrows[index].setLength(direction.length()*5);
         }
 
-        if (selected != null && member.index === selected) {
-            member.agent.material = blueAgentMaterial;
+        if (g_arrows.length>0){
+
+            // let newSourcePos = member.agent.position;
+            // let newTargetPos = new THREE.Vector3(member.x, member.y, member.z);
+
+            g_arrows[index].position.x = member.x;
+            g_arrows[index].position.y = member.y;
+            g_arrows[index].position.z = member.z;
+
+            if(member.exit === null || member.path === null){
+                return;
+            }
+            // // console.log(member.exit);
+
+            let keypoint = member.path[member.key_index];
+
+            let direction = new THREE.Vector3(keypoint[0] - member.x, 0, keypoint[1] - member.z);
+            g_arrows[index].setDirection(direction.normalize());
+            g_arrows[index].setLength(direction.length()*8);
         }
+
+
+        // if (selected != null && member.index === selected) {
+        //     member.agent.material = blueAgentMaterial;
+        // }
         /* TODO finish this part for spotlight agents
 
 
