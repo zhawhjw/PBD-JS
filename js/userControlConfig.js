@@ -119,7 +119,11 @@ function preAllocateTiles(){
 
             let geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
 
-            let material = tileMaterial;
+            let material = new THREE.MeshStandardMaterial({
+                transparent: true,
+                opacity: 0.0,
+                color: 0x00ff00 // set a color to see the transparent effect
+            });
             // if (tiles[i][j].cost >= 10){
             //     material = tileMaterial;
             // }else {
@@ -614,8 +618,16 @@ function changeOpening(){
 
             }else {
                 tiles[i][j].cost = 1;
-                pickableTiles[index].material = tileMaterial;
-                cubeInScene.material = tileMaterial;
+                pickableTiles[index].material =  new THREE.MeshStandardMaterial({
+                    transparent: true,
+                    opacity: 0.0,
+                    color: 0x00ff00 // set a color to see the transparent effect
+                });
+                cubeInScene.material = new THREE.MeshStandardMaterial({
+                    transparent: true,
+                    opacity: 0.0,
+                    color: 0x00ff00 // set a color to see the transparent effect
+                });
                 pickableWalkingTiles.push(pickableTiles[index]);
 
 
@@ -690,10 +702,10 @@ function AStar(ts, start, end, agent) {
                 currentTile = path[pointer];
             }
             // push the destination tile
-            smoothedPath.push({x:agent.goal_x, z:agent.goal_z});
+            smoothedPath.push(path[pointer-1]);
 
 
-            let smoothedPathV2 = samplePointsBetweenPoints(smoothedPath, 5);
+            let smoothedPathV2 = samplePointsBetweenPoints(smoothedPath, 5, agent);
 
 
 
@@ -1229,7 +1241,7 @@ function loadAgentMesh(){
 
 
 
-function samplePointsBetweenPoints(points, m) {
+function samplePointsBetweenPoints(points, m, a) {
     // Initialize an array to store the sampled points
     const sampledPoints = [];
 
@@ -1257,7 +1269,7 @@ function samplePointsBetweenPoints(points, m) {
 
     const endPoint = points[points.length-1];
     const [ex1, ey1] = [endPoint.x, endPoint.z];
-    sampledPoints.push([ex1, ey1]);
+    sampledPoints.push([a.goal_x, a.goal_z]);
 
     // Return the array of sampled points
     return sampledPoints;
@@ -1386,6 +1398,13 @@ function performAStar() {
 
         // let copy_path = deepCloneArray(path);
 
+        path.forEach(function (G, index) {
+
+            if (index === 0 || index === path.length-1 ){
+                pickableTiles[G.r * world.x / tile.w + G.c].material.opacity = 0.5;
+            }
+        });
+
 
         // console.log(copy_path);
 
@@ -1437,6 +1456,13 @@ function animate() {
         }
 
         baseFlag = baseFlag && agent.simEnd;
+
+        if(agent.simEnd === true){
+            agent.agent.material = new THREE.MeshLambertMaterial({
+                color: 0x00ff00
+            });
+        }
+
     })
 
 
@@ -1464,7 +1490,7 @@ function animate() {
             member.agent.position.x = member.x;
             member.agent.position.y = member.y;
             member.agent.position.z = member.z;
-            member.agent.material = redAgentMaterial;
+            // member.agent.material = redAgentMaterial;
             // if (selected != null && member.index === selected) {
             //     member.agent.material = blueAgentMaterial;
             // }
