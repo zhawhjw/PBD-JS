@@ -881,6 +881,9 @@ function init() {
         item.agent = agent;
         pickableObjects.push(agent);
     });
+
+
+
     window.addEventListener("resize", onWindowResize);
     window.addEventListener("click", mouseDown, false);
     window.addEventListener("mousemove", mouseMove, false);
@@ -1145,9 +1148,9 @@ function animate() {
         member.agent.position.y = member.y;
         member.agent.position.z = member.z;
         member.agent.material = redAgentMaterial;
-        if (selected != null && member.index === selected) {
-            member.agent.material = blueAgentMaterial;
-        }
+        // if (selected != null && member.index === selected) {
+            // member.agent.material = blueAgentMaterial;
+        // }
         /* TODO finish this part for spotlight agents 
         
 

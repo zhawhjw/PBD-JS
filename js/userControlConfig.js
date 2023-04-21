@@ -32,30 +32,6 @@ class Tile {
 
 
 
-//
-// let gui;
-// const api = {
-//     state: 'Noise',
-//     camera: 'Camera'
-// };
-// function createGUI() {
-//     // TODO append your noise name to the states list below
-//     const states = ['Rule-Based', 'Random', 'Blue Noise'];
-//     const cameras = ['Top View', 'FPS'];
-//     gui = new GUI();
-//     const statesFolder = gui.addFolder('States');
-//     const camerasFolder = gui.addFolder('Cameras');
-//     const clipCtrl = statesFolder.add(api, 'state').options(states);
-//     const cameraCtrl = camerasFolder.add(api, 'camera').options(cameras);
-//     cameraCtrl.onChange(function() {
-//
-//     });
-//     clipCtrl.onChange(function() {
-//         // switchNoise(api.state);
-//     });
-//     statesFolder.open();
-// }
-//
 // createGUI();
 let stats = new Stats();
 document.body.appendChild(stats.dom);
@@ -63,9 +39,20 @@ document.body.appendChild(stats.dom);
 
 let renderer, scene, camera;
 let world = {
-    x: 100,
-    z: 100
+    x: 120,
+    z: 120
 };
+const wallMaterial = new THREE.MeshStandardMaterial({
+    transparent: true,
+    opacity: 1.0,
+    color: 0x333333 // set a color to disable the transparent effect
+});
+
+const tileMaterial = new THREE.MeshStandardMaterial({
+    transparent: true,
+    opacity: 0.0,
+    color: 0x00ff00 // set a color to see the transparent effect
+});
 
 
 
@@ -77,17 +64,96 @@ const start_point = {
 let global_frames = []; // An array to hold the frame data
 let global_frame_pointer = 0;
 let agentData = [];
-// let wallData = [];
+let inactiveData = [];
+let wallData = [];
 // for ray to detect
 let pickableObjects = [];
 let pickableTiles = [];
-// let pickableWalkingTiles = [];
+let pickableWalkingTiles = [];
 let pickableWall = [];
-
 let sampledAgentData = [];
-
-
 let tiles = [];
+
+
+// GUI parameters
+let max_agents = 80;
+let ROWS = 0, COLUMNS = 0;
+
+function sliceArray(arr, S, E) {
+    return arr.slice(S, E + 1);
+}
+
+function preAllocateAgents(){
+
+    let agentGeom, agentMaterial, agent;
+
+    for (let i =0;i<max_agents;i++){
+
+        agentGeom = new THREE.CylinderGeometry(RADIUS, RADIUS, 4, 16);
+        agentMaterial = new THREE.MeshLambertMaterial({
+            color: 0xff0000
+        });
+
+
+        agent = new THREE.Mesh(agentGeom, agentMaterial);
+        agent.name = "Agent_" + i;
+        agent.castShadow = true;
+        agent.receiveShadow = true;
+        agent.userData = {
+            "index": i,
+            "start_tile": null,
+            "end_tile": null
+        };
+
+        pickableObjects.push(agent);
+        scene.add(agent);
+    }
+
+}
+
+function preAllocateTiles(){
+
+    for (let i = 0; i < ROWS; i++) {
+        for (let j = 0; j < COLUMNS; j++) {
+
+
+            let geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
+
+            let material = tileMaterial;
+            // if (tiles[i][j].cost >= 10){
+            //     material = tileMaterial;
+            // }else {
+            //     material = wallMaterial;
+            // }
+
+            // Create a mesh by combining the geometry and the material
+            let cube = new THREE.Mesh(geometry, material);
+
+            // Set the mesh's name and userData properties
+            cube.name = "MyCube_" + i + "_" + j;
+            cube.userData = {
+                type: "box",
+                x: tiles[i][j].x,
+                y: tiles[i][j].y,
+                z: tiles[i][j].z,
+
+                r: tiles[i][j].r,
+                c: tiles[i][j].c,
+            };
+            cube.position.set(tiles[i][j].x, tiles[i][j].y, tiles[i][j].z);
+            pickableTiles.push(cube);
+            scene.add(cube);
+
+        }
+    }
+
+
+}
+
+
+
+
+
 
 let selected = null;
 let selectedObject = null;
@@ -95,7 +161,7 @@ let selectedObject = null;
 let mouse = new THREE.Vector2();
 const raycaster = new THREE.Raycaster();
 let grid, ring;
-let rows, columns;
+// let rows, columns;
 let spotLights = {};
 let topTexture;
 const RADIUS = 0.4;
@@ -120,7 +186,7 @@ const w = 10;
 const h = 45;
 const particle_distance = RADIUS * 2;
 const epsilon = RADIUS + 0.2;
-const num_points = 40;
+const num_points = 41;
 
 let opening_size = 2;
 let start_x_shift = 40;
@@ -137,65 +203,65 @@ let goal_x = 0 + goal_x_shift;
 
 function clean(){
 
-    while(scene.children.length > 0){
-        scene.remove(scene.children[0]);
-    }
+    // while(scene.children.length > 0){
+    //     scene.remove(scene.children[0]);
+    // }
+    //
+    //
+    // // console.log('dispose renderer!')
+    // renderer.dispose()
+    //
+    // scene.traverse(object => {
+    //     if (!object.isMesh) return
+    //
+    //     // console.log('dispose geometry!')
+    //     object.geometry.dispose()
+    //
+    //     if (object.material.isMaterial) {
+    //         cleanMaterial(object.material)
+    //     } else {
+    //         // an array of materials
+    //         for (const material of object.material) cleanMaterial(material)
+    //     }
+    // })
+    //
+    // const cleanMaterial = material => {
+    //     // console.log('dispose material!')
+    //     material.dispose()
+    //
+    //     // dispose textures
+    //     for (const key of Object.keys(material)) {
+    //         const value = material[key]
+    //         if (value && typeof value === 'object' && 'minFilter' in value) {
+    //             // console.log('dispose texture!')
+    //             value.dispose()
+    //         }
+    //     }
+    // }
 
 
-    console.log('dispose renderer!')
-    renderer.dispose()
-
-    scene.traverse(object => {
-        if (!object.isMesh) return
-
-        console.log('dispose geometry!')
-        object.geometry.dispose()
-
-        if (object.material.isMaterial) {
-            cleanMaterial(object.material)
-        } else {
-            // an array of materials
-            for (const material of object.material) cleanMaterial(material)
-        }
-    })
-
-    const cleanMaterial = material => {
-        console.log('dispose material!')
-        material.dispose()
-
-        // dispose textures
-        for (const key of Object.keys(material)) {
-            const value = material[key]
-            if (value && typeof value === 'object' && 'minFilter' in value) {
-                console.log('dispose texture!')
-                value.dispose()
-            }
-        }
-    }
-
-
+    // tiles.length = 0;
+    // pickableObjects.length = 0;
 
     agentData.length = 0;
-    // wallData.length = 0;
-    pickableObjects.length = 0;
-    pickableTiles.length = 0;
-    // pickableWalkingTiles.length = 0;
+    inactiveData.length = 0;
+    wallData.length = 0;
+    // pickableTiles.length = 0;
+    pickableWalkingTiles.length = 0;
     pickableWall.length = 0;
-    tiles.length = 0;
     sampledAgentData.length = 0;
     global_frames.length = 0; // An array to hold the frame data
     global_frame_pointer = 0;
 
-    spotLights = {};
-    for (let prop in spotLights) {
-        if (spotLights.hasOwnProperty(prop)) {
-            delete spotLights[prop];
-        }
-    }
+    // for (let prop in spotLights) {
+    //     if (spotLights.hasOwnProperty(prop)) {
+    //         delete spotLights[prop];
+    //     }
+    // }
 
-    camera  = null;
-    ring = grid = selectedObject = selected = rows = columns = null;
-    topTexture = null;
+    // camera  = null;
+    selectedObject = selected = null;
+    // topTexture = null;
 
 
 
@@ -319,60 +385,14 @@ function sliceArrayWithWindow(arr, k) {
     return arr.slice(windowStart, windowEnd + 1);
 }
 
-let allobstacles = [
-    [20, 0],
-    [20, 1],
-    [20, 2],
-    [20, 3],
-    [20, 4],
-    [20, 5],
-    [20, 6],
-    [20, 7],
-    [20, 8],
-    [20, 9],
-    [20, 10],
-    [20, 11],
-    [20, 12],
-    [20, 13],
-    [20, 14],
-    [20, 15],
-    [20, 16],
-    [20, 17],
-    [20, 18],
-    [20, 19],
-    [20, 20],
-    [20, 21],
-    [20, 22],
-    [20, 23],
-    [20, 24],
-    [20, 25],
-    [20, 26],
-    [20, 27],
-    [20, 28],
-    [20, 29],
-    [20, 30],
-    [20, 31],
-    [20, 32],
-    [20, 33],
-    [20, 34],
-    [20, 35],
-    [20, 36],
-    [20, 37],
-    [20, 38],
-    [20, 39],
-    [20, 40],
-    [20, 41],
-    [20, 42],
-    [20, 43],
-    [20, 44],
-    [20, 45],
-    [20, 46],
-    [20, 47],
-    [20, 48],
-    [20, 49],
+let allobstacles = [];
+
+for (let i =0; i<Math.floor(world.x / 2) ;i++){
+    allobstacles.push([Math.floor(world.x / 2 / 2), i]);
+}
 
 
-]
+
 let opening = sliceArrayWithWindow(allobstacles, opening_size);
 let obstacles = allobstacles.filter(x => !opening.includes(x));
 
@@ -411,40 +431,50 @@ let text = {
 
 let gui = new GUI({ autoPlace: false });
 let menu = gui.addFolder('folder');
-menu.add(text, 'left_dist2opening', 0, 40).name('Dist2Start').onChange(function (){});
-menu.add(text, 'right_dist2opening', 0, 40).name('Dist2Goal').onChange(function (){});
+menu.add(text, 'left_dist2opening', 15, 40).name('Dist2Start').onChange(function (){
+    clean();
+    sampledAgentData =  gaussianSampling();
+    loadFromAgentGUI();
+    loadAgentMesh();
+    changeOpening()
+    performAStar();
+});
+menu.add(text, 'right_dist2opening', 10, 40).name('Dist2Goal').onChange(function (){
+    clean();
+    sampledAgentData =  gaussianSampling();
+    loadFromAgentGUI();
+    loadAgentMesh();
+    changeOpening()
+    performAStar();
+});
 menu.add(text, 'opening',  1, 50).step(1).name('Opening Size').onChange(function (){
     clean();
-    init();
-    gridization();
+    sampledAgentData =  gaussianSampling();
+    loadFromAgentGUI();
+    loadAgentMesh();
+    changeOpening()
+    performAStar();
 });
-menu.add(text, 'AgentNumber',  10, 80).step(1).name('Agent Number').onChange(function (){});
-menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function (){
-    // myRandomFunction = Math.seed(text.Seed);
-    // randomNumber = myRandomFunction();
-    // console.log(randomNumber);
+menu.add(text, 'AgentNumber',  10, max_agents).step(1).name('Agent Number').onChange(function (){
     clean();
-    init();
-    gridization();
-    // render();
+    sampledAgentData =  gaussianSampling();
+    loadFromAgentGUI();
+    loadAgentMesh();
+    changeOpening()
+    performAStar();
+});
+menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function (){
+    clean();
+    sampledAgentData =  gaussianSampling();
+    loadFromAgentGUI();
+    loadAgentMesh();
+    changeOpening()
+    performAStar();
 });
 menu.add(text, 'download').name('Download')
 
 const customContainer = document.getElementById('my-gui-container');
 customContainer.appendChild(gui.domElement);
-
-const wall_material = new THREE.MeshStandardMaterial({
-    transparent: true,
-    opacity: 1.0,
-    color: 0x333333 // set a color to disable the transparent effect
-});
-
-
-const transparency_material = new THREE.MeshStandardMaterial({
-    transparent: true,
-    opacity: 0.0,
-    color: 0x00ff00 // set a color to see the transparent effect
-});
 
 
 function gaussianSampling(){
@@ -477,14 +507,10 @@ function gaussianSampling(){
         [real_x, real_y] = [(real_x1 + real_x2) / 2, (real_y1 + real_y2) / 2];
     }
 
-    console.log(real_x + ", " + real_y);
-// print("{} {}".format(real_x, real_y))
+    let points = Array(text.AgentNumber).fill().map((_, index) => random_point(w, h, text.Seed + index));
 
 
 
-
-    let points = Array(num_points).fill().map((_, index) => random_point(w, h, text.Seed + index));
-// console.log(array);
 
     for (let i =0; i<points.length;i++){
         for (let j =0; j<points.length;j++){
@@ -494,9 +520,9 @@ function gaussianSampling(){
             }
 
 
-            if (j === 39){
-                console.log();
-            }
+            // if (j === 39){
+            //     console.log();
+            // }
 
             let p1 = points[i];
             let p2 = points[j];
@@ -514,13 +540,16 @@ function gaussianSampling(){
         }
     }
 
-
-
     for (let i =0; i<points.length;i++){
         let [x, y] = points[i];
 
-        points[i] = [x - start_x_shift, y];
+        points[i] = [x - text.left_dist2opening, y];
+
+        if (points[0] < -Math.floor(world.x / 2) - RADIUS){
+            points[0] = -Math.floor(world.x / 2) - RADIUS;
+        }
     }
+
 
 
 
@@ -529,7 +558,7 @@ function gaussianSampling(){
     let goalsV2 = [];
 
     points.forEach(function (item, idx){
-        goals.push([goal_x, real_y - idx * (particle_distance + epsilon)])
+        goals.push([text.right_dist2opening, real_y - idx * (particle_distance + epsilon)])
     });
 
 
@@ -541,8 +570,8 @@ function gaussianSampling(){
         goalsV2.push([x, y + delta])
     });
 
-    console.log(points);
-    console.log(goalsV2);
+    // console.log(points);
+    // console.log(goalsV2);
 
     let sampledAgent = [];
     for (let i = 0; i<points.length;i++){
@@ -551,7 +580,7 @@ function gaussianSampling(){
         const goal = goalsV2[i];
 
         const agent_data = {
-            'agent_id': i + 1,
+            'agent_id': i,
             'x': start[0],
             'y': start[1],
             'gx': goal[0],
@@ -565,9 +594,41 @@ function gaussianSampling(){
 
     return sampledAgent;
 }
+function changeOpening(){
+
+    opening = sliceArrayWithWindow(allobstacles, text.opening);
+    obstacles = allobstacles.filter(x => !opening.includes(x));
+
+    for (let i = 0; i < ROWS; i++) {
+        for (let j = 0; j < COLUMNS; j++) {
+            const index = i * ROWS + j;
+            let cubeInScene = scene.getObjectByName("MyCube_" + i + "_" + j)
+
+            if (checkContainsTuple(obstacles, [i, j])){
+                tiles[i][j].cost = 10;
+                pickableTiles[index].material = wallMaterial;
+                cubeInScene.material = wallMaterial;
+
+                pickableWall.push(pickableTiles[index]);
+                wallData.push(pickableTiles[index].userData);
+
+            }else {
+                tiles[i][j].cost = 1;
+                pickableTiles[index].material = tileMaterial;
+                cubeInScene.material = tileMaterial;
+                pickableWalkingTiles.push(pickableTiles[index]);
+
+
+            }
+
+        }
+    }
+
+}
 
 // let goals = [[goal_x, real_y - idx * (particle_distance + epsilon)] for idx, (x, y) in enumerate(points)]
 
+// sampledAgentData =  gaussianSampling();
 
 // console.log(sampledAgentData);
 
@@ -579,7 +640,7 @@ function gaussianSampling(){
 
 // let points = np.array([random_point(w, h) for _ in range(num_points)])
 
-function AStar(ts, start, end) {
+function AStar(ts, start, end, agent) {
     const openSet = [start];
     const closedSet = [];
 
@@ -629,7 +690,7 @@ function AStar(ts, start, end) {
                 currentTile = path[pointer];
             }
             // push the destination tile
-            smoothedPath.push(path[pointer-1]);
+            smoothedPath.push({x:agent.goal_x, z:agent.goal_z});
 
 
             let smoothedPathV2 = samplePointsBetweenPoints(smoothedPath, 5);
@@ -739,7 +800,29 @@ function heuristic(a, b) {
     return Math.abs(a.r - b.r) + Math.abs(a.c - b.c);
 }
 
-function cut(){
+// function cut(){
+//     let world_width = world.x;
+//     let world_height = world.z;
+//
+//     let tile_width = tile.w;
+//     let tile_height = tile.h;
+//
+//     let Rs =   Math.floor(world_width / tile_width);
+//     let Cs = Math.floor(world_height / tile_height);
+//
+//     if (world_width % tile_height !== 0){
+//         Rs += 1;
+//     }
+//
+//     if (world_height % tile_height !== 0){
+//         Cs += 1;
+//     }
+//
+//     return [Rs, Cs];
+// }
+
+function gridization(){
+
     let world_width = world.x;
     let world_height = world.z;
 
@@ -757,21 +840,14 @@ function cut(){
         Cs += 1;
     }
 
-    return [Rs, Cs];
-}
-
-function gridization(){
-
-    [rows, columns] = cut();
+    [ROWS, COLUMNS] = [Rs, Cs];
 
     const basicCost = 1;
-    const obstacleCost = 10;
 
-
-    for (let i = 0; i < rows; i++) {
+    for (let i = 0; i < ROWS; i++) {
         tiles[i] = [];
 
-        for (let j = 0; j < columns; j++) {
+        for (let j = 0; j < COLUMNS; j++) {
 
             const object_position = {
                 x: start_point.x + WORLDUNIT + i * tile.w,
@@ -779,52 +855,58 @@ function gridization(){
                 z: start_point.z + WORLDUNIT + j * tile.h,
             };
 
-            let cost;
-            if (checkContainsTuple(obstacles, [i, j])){
-                cost = obstacleCost;
-            }else {
-                cost = basicCost;
-
-            }
-
-            tiles[i][j] = new Tile(i, j, object_position.x, object_position.y, object_position.z, cost);
-
-            let geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
-
-            let material;
-            if (tiles[i][j].cost >= 10){
-                material = wall_material;
-
-            }else {
-                material = transparency_material;
-            }
-
-            // Create a mesh by combining the geometry and the material
-            let cube = new THREE.Mesh(geometry, material);
-
-            // Set the mesh's name and userData properties
-            cube.name = "MyCube_" + i + "_" + j;
-            cube.userData = {
-                type: "box",
-                x: tiles[i][j].x,
-                y: tiles[i][j].y,
-                z: tiles[i][j].z,
-
-                r: tiles[i][j].r,
-                c: tiles[i][j].c,
-            };
-            cube.position.set(tiles[i][j].x, tiles[i][j].y, tiles[i][j].z);
 
 
-            if(tiles[i][j].cost >= 10){
-                pickableWall.push(cube);
+            // let cost;
+            // if (checkContainsTuple(obstacles, [i, j])){
+            //     cost = obstacleCost;
+            // }else {
+            //     cost = basicCost;
+            //
+            // }
 
-            }
+            tiles[i][j] = new Tile(i, j, object_position.x, object_position.y, object_position.z, basicCost);
 
-
-            pickableTiles.push(cube);
-            // Add the mesh to the scene
-            scene.add(cube);
+        //     let geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
+        //
+        //     let material;
+        //     if (tiles[i][j].cost >= 10){
+        //         material = wall_material;
+        //
+        //     }else {
+        //         material = transparency_material;
+        //     }
+        //
+        //     // Create a mesh by combining the geometry and the material
+        //     let cube = new THREE.Mesh(geometry, material);
+        //
+        //     // Set the mesh's name and userData properties
+        //     cube.name = "MyCube_" + i + "_" + j;
+        //     cube.userData = {
+        //         type: "box",
+        //         x: tiles[i][j].x,
+        //         y: tiles[i][j].y,
+        //         z: tiles[i][j].z,
+        //
+        //         r: tiles[i][j].r,
+        //         c: tiles[i][j].c,
+        //     };
+        //     cube.position.set(tiles[i][j].x, tiles[i][j].y, tiles[i][j].z);
+        //
+        //
+        //     if(tiles[i][j].cost >= 10){
+        //         pickableWall.push(cube);
+        //         wallData.push(cube.userData);
+        //
+        //     }else {
+        //         pickableWalkingTiles.push(cube);
+        //     }
+        //
+        //
+        //     pickableTiles.push(cube);
+        //     // Add the mesh to the scene
+        //     scene.add(cube);
+        // }
         }
     }
 
@@ -891,70 +973,16 @@ renderer.shadowMap.type = THREE.PCFSoftShadowMap; //
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
+
+
+
+
+
 function init() {
 
     // stats = new Stats();
 
-    allobstacles = [
-        [20, 0],
-        [20, 1],
-        [20, 2],
-        [20, 3],
-        [20, 4],
-        [20, 5],
-        [20, 6],
-        [20, 7],
-        [20, 8],
-        [20, 9],
-        [20, 10],
-        [20, 11],
-        [20, 12],
-        [20, 13],
-        [20, 14],
-        [20, 15],
-        [20, 16],
-        [20, 17],
-        [20, 18],
-        [20, 19],
-        [20, 20],
-        [20, 21],
-        [20, 22],
-        [20, 23],
-        [20, 24],
-        [20, 25],
-        [20, 26],
-        [20, 27],
-        [20, 28],
-        [20, 29],
-        [20, 30],
-        [20, 31],
-        [20, 32],
-        [20, 33],
-        [20, 34],
-        [20, 35],
-        [20, 36],
-        [20, 37],
-        [20, 38],
-        [20, 39],
-        [20, 40],
-        [20, 41],
-        [20, 42],
-        [20, 43],
-        [20, 44],
-        [20, 45],
-        [20, 46],
-        [20, 47],
-        [20, 48],
-        [20, 49],
 
-
-    ]
-    opening = sliceArrayWithWindow(allobstacles, text.opening);
-    obstacles = allobstacles.filter(x => !opening.includes(x));
-
-
-
-    sampledAgentData =  gaussianSampling();
 
 
     // scene
@@ -1037,75 +1065,81 @@ function init() {
     ring.rotation.x = -Math.PI / 2;
     ring.position.y += 0.01;
 
-    function addColumnAgentGroup(agentData, numAgents, spacing,
-        startPos, goalPos,
-        velocityMagnitude, direction) {
-        let i = 0;
-        let initalIdx = agentData.length;
-        let dx = 0,
-            dz = 0,
-            vx = 0,
-            vz = 0;
-        let distanceToGoal = PHY.distance(startPos.x, startPos.z,
-            goalPos.x, goalPos.z);
-        vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
-        vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
 
-        if (direction === "X") {
-            dx = spacing;
-        } else if (direction === "Z") {
-            dz = spacing;
-        }
-        while (i < numAgents) {
-            agentData.push({
-                index: i + initalIdx,
-                x: startPos.x + dx * i,
-                y: 2.0,
-                z: startPos.z + dz * i,
-                goal_x: goalPos.x + dx * i,
-                goal_y: 0.0,
-                goal_z: goalPos.z + dz * i,
-                vx: vx,
-                vy: 0.0,
-                vz: vz,
-                v_pref: Math.sqrt(vx * vx + vz * vz),
-                radius: RADIUS,
-                invmass: 0.5,
-                group_id: 1,
 
-                path : null,
-                path_index: 0,
+    // world.distanceConstraints = [];
 
-                simEnd:null,
+    // let agentGeom, agentMaterial, agent;
+    //
+    //
+    // agentData.forEach(function(item, index) {
+    //
+    //
+    //     agentGeom = new THREE.CylinderGeometry(item.radius, item.radius, 4, 16);
+    //     agentMaterial = new THREE.MeshLambertMaterial({
+    //         color: 0xff0000
+    //     });
+    //
+    //     agent = new THREE.Mesh(agentGeom, agentMaterial);
+    //     agent.castShadow = true;
+    //     agent.receiveShadow = true;
+    //     agent.userData = {
+    //         "index": item.index,
+    //         "start_tile": null,
+    //         "end_tile": null
+    //     };
+    //     scene.add(agent);
+    //     // -----------------
+    //     //adding spotlight code
+    //     if(index ===0){
+    //         // spotLight = new THREE.SpotLight(0xffffff);
+    //         // spotLight.position.set(item.x, item.y + 6, item.z);
+    //         // spotLight.shadow.mapSize.width = 1024;
+    //         // spotLight.shadow.mapSize.height = 1024;
+    //         // spotLight.shadow.camera.near = 500;
+    //         // spotLight.shadow.camera.far = 4000;
+    //         // spotLight.shadow.camera.fov = 30;
+    //         // spotLight.intensity = 0.4;
+    //         // spotLight.angle = Math.PI / 8;
+    //         // spotLightTarget = new THREE.Object3D();
+    //         // scene.add(spotLightTarget);
+    //         // spotLight.target = spotLightTarget;
+    //         // scene.add(spotLight);
+    //         // spotLights[item.index] = spotLight;
+    //     }
+    //     // ----------------
+    //     item.agent = agent;
+    //     pickableObjects.push(agent);
+    // });
 
-                correction: false,
 
-                move: true,
-            });
-            i += 1;
-        }
+}
+function addColumnAgentGroup(agentData, numAgents, spacing, startPos, goalPos, velocityMagnitude, direction) {
+    let i = 0;
+    let initalIdx = agentData.length;
+    let dx = 0,
+        dz = 0,
+        vx = 0,
+        vz = 0;
+    let distanceToGoal = PHY.distance(startPos.x, startPos.z,
+        goalPos.x, goalPos.z);
+    vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
+    vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
+
+    if (direction === "X") {
+        dx = spacing;
+    } else if (direction === "Z") {
+        dz = spacing;
     }
-
-    function addOneAgents(agentData, id,
-                                 startPos, goalPos,
-                                 velocityMagnitude) {
-
-        let vx = 0,
-            vz = 0;
-        let distanceToGoal = PHY.distance(startPos.x, startPos.z,
-            goalPos.x, goalPos.z);
-        vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
-        vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
-
-
+    while (i < numAgents) {
         agentData.push({
-            index: id,
-            x: startPos.x,
+            index: i + initalIdx,
+            x: startPos.x + dx * i,
             y: 2.0,
-            z: startPos.z,
-            goal_x: goalPos.x,
+            z: startPos.z + dz * i,
+            goal_x: goalPos.x + dx * i,
             goal_y: 0.0,
-            goal_z: goalPos.z,
+            goal_z: goalPos.z + dz * i,
             vx: vx,
             vy: 0.0,
             vz: vz,
@@ -1116,78 +1150,82 @@ function init() {
 
             path : null,
             path_index: 0,
+
+            simEnd:null,
+
             correction: false,
-
+            modifier:1,
+            move: true,
         });
+        i += 1;
+    }
+}
+function addOneAgents(agentData, id, startPos, goalPos, velocityMagnitude) {
+
+    let vx = 0,vz = 0;
+    let distanceToGoal = PHY.distance(startPos.x, startPos.z,
+        goalPos.x, goalPos.z);
+    vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
+    vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
+
+
+    agentData.push({
+        index: id,
+        x: startPos.x,
+        y: 2.0,
+        z: startPos.z,
+        goal_x: goalPos.x,
+        goal_y: 0.0,
+        goal_z: goalPos.z,
+        vx: vx,
+        vy: 0.0,
+        vz: vz,
+        v_pref: Math.sqrt(vx * vx + vz * vz),
+        radius: RADIUS,
+        invmass: 0.5,
+        group_id: 1,
+        modifier:1,
+        path : null,
+        path_index: 0,
+        correction: false,
+
+    });
+
+}
+function loadFromAgentGUI(){
+    sampledAgentData.forEach(function(item){
+        addOneAgents(agentData, item.agent_id, {x:item.x, z:item.y}, {x:item.gx, z:item.gy}, 0.8);
+
+    });
+
+    for (let i = sampledAgentData.length; i<max_agents; i++){
+        addOneAgents(inactiveData, i, {x:world.x, z:world.z}, {x:world.x, z:world.z}, 0.8);
 
     }
-    function loadFromAgentGUI(){
-        sampledAgentData.forEach(function(item, index){
+}
+function loadAgentMesh(){
 
-            addOneAgents(agentData, item.agent_id, {x:item.x, z:item.y}, {x:item.gx, z:item.gy}, 0.8);
+    agentData.forEach(function (item){
 
-        });
-    }
-    loadFromAgentGUI();
+        item.agent = scene.getObjectByName("Agent_" + item.index);
+        item.agent.position.x = item.x;
+        item.agent.position.y = item.y;
+        item.agent.position.z = item.z;
 
+    });
 
+    inactiveData.forEach(function (item){
+        item.agent = scene.getObjectByName("Agent_" + item.index);
+        item.agent.position.x = item.x;
+        item.agent.position.y = item.y;
+        item.agent.position.z = item.z;
 
-
-    world.distanceConstraints = [];
-
-
-
-
-
-    let agentGeom, agentMaterial, agent;
-    let spotLight, spotLightTarget;
-
-    agentData.forEach(function(item, index) {
-
-
-        agentGeom = new THREE.CylinderGeometry(item.radius, item.radius, 4, 16);
-        agentMaterial = new THREE.MeshLambertMaterial({
-            color: 0x00ff00
-        });
-
-        agent = new THREE.Mesh(agentGeom, agentMaterial);
-        agent.castShadow = true;
-        agent.receiveShadow = true;
-        agent.userData = {
-            "index": item.index,
-            "start_tile": null,
-            "end_tile": null
-        };
-        scene.add(agent);
-        // -----------------
-        //adding spotlight code
-        if(index ===0){
-            // spotLight = new THREE.SpotLight(0xffffff);
-            // spotLight.position.set(item.x, item.y + 6, item.z);
-            // spotLight.shadow.mapSize.width = 1024;
-            // spotLight.shadow.mapSize.height = 1024;
-            // spotLight.shadow.camera.near = 500;
-            // spotLight.shadow.camera.far = 4000;
-            // spotLight.shadow.camera.fov = 30;
-            // spotLight.intensity = 0.4;
-            // spotLight.angle = Math.PI / 8;
-            // spotLightTarget = new THREE.Object3D();
-            // scene.add(spotLightTarget);
-            // spotLight.target = spotLightTarget;
-            // scene.add(spotLight);
-            // spotLights[item.index] = spotLight;
-        }
-        // ----------------
-        item.agent = agent;
-        pickableObjects.push(agent);
     });
 
 
 
-
-
-
 }
+
 
 
 
@@ -1299,8 +1337,8 @@ function performAStar() {
 
 
 
-        for (let i = 0; i< rows;i++) {
-            for (let j = 0; j < columns; j++) {
+        for (let i = 0; i< ROWS;i++) {
+            for (let j = 0; j < COLUMNS; j++) {
                 // Create a box geometry and a mesh material
 
                 tiles[i][j].g = tiles[i][j].cost;
@@ -1322,7 +1360,7 @@ function performAStar() {
 
 
 
-        const index = r * rows + c;
+        const index = r * ROWS + c;
 
         const t1 = pickableTiles[index];
 
@@ -1344,18 +1382,10 @@ function performAStar() {
 
 
 
-        const [path, smoothPath] = AStar(tiles, selectedObject.userData.start_tile, selectedObject.userData.end_tile);
+        const [path, smoothPath] = AStar(tiles, selectedObject.userData.start_tile, selectedObject.userData.end_tile, a);
 
         // let copy_path = deepCloneArray(path);
 
-        path.forEach(function (G, index) {
-            // pickableTiles[G.r * world.x / tile.w + G.c].material.opacity = 0.5;
-            // if (index === 0 || index === path.length-1 ){
-            //
-            // }
-
-
-        });
 
         // console.log(copy_path);
 
@@ -1374,15 +1404,17 @@ function mouseDown(event) {
 
 
 
-
+    // console.log(pickableObjects);
     selected = null;
     var intersects = raycaster.intersectObjects(pickableObjects, false);
+    console.log(intersects);
     for (var i = 0; i < intersects.length; i++) {
         /* TODO finish this part as 
          */
         selectedObject = intersects[i].object;
+
         selected = selectedObject.userData.index;
-        console.log(selectedObject);
+
         break;
     }
 }
@@ -1427,32 +1459,47 @@ function animate() {
 
 
     agentData.forEach(function(member) {
-        member.agent.position.x = member.x;
-        member.agent.position.y = member.y;
-        member.agent.position.z = member.z;
-        member.agent.material = redAgentMaterial;
-        if (selected != null && member.index === selected) {
-            member.agent.material = blueAgentMaterial;
-        }
-        /* TODO finish this part for spotlight agents 
-        
 
-         */
+        if (member.agent){
+            member.agent.position.x = member.x;
+            member.agent.position.y = member.y;
+            member.agent.position.z = member.z;
+            member.agent.material = redAgentMaterial;
+            // if (selected != null && member.index === selected) {
+            //     member.agent.material = blueAgentMaterial;
+            // }
+            /* TODO finish this part for spotlight agents
+
+
+             */
+        }
+
+
     });
-    renderer.render(scene, camera);
+    render();
     stats.update()
 
 
-};
-
+}
 
 init();
+preAllocateAgents();
 gridization();
+preAllocateTiles();
+
+sampledAgentData =  gaussianSampling();
+loadFromAgentGUI();
+loadAgentMesh();
+changeOpening();
+
+
+
 window.addEventListener("resize", onWindowResize);
-window.addEventListener("click", mouseDown, false);
-window.addEventListener("mousemove", mouseMove, false);
-window.addEventListener("contextmenu", rightClick, false);
+// window.addEventListener("click", mouseDown, false);
+// window.addEventListener("mousemove", mouseMove, false);
+// window.addEventListener("contextmenu", rightClick, false);
 // document.getElementById('download-btn').addEventListener('click', downloadSimData, false);
 // performAStar();
-render();
+// render();
 animate();
+performAStar();

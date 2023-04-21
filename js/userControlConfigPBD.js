@@ -657,7 +657,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT) 
 
 
                 // following(sceneEntities[i],sceneEntities[j]);
-                followingV2(sceneEntities[i], sceneEntities[j]);
+                // followingV2(sceneEntities[i], sceneEntities[j]);
 
                 collisionConstraint(sceneEntities[i],sceneEntities[j]);
 
