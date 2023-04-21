@@ -3,8 +3,6 @@ import * as PHY from 'simplePhysics';
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
 import Stats from 'three/addons/libs/stats.module.js';
-
-import * as A from "agentConfiguration"
 // import {agentConfig} from "./positions";
 import {GUI} from 'three/addons/libs/lil-gui.module.min.js';
 
@@ -79,11 +77,11 @@ const start_point = {
 let global_frames = []; // An array to hold the frame data
 let global_frame_pointer = 0;
 let agentData = [];
-let wallData = [];
+// let wallData = [];
 // for ray to detect
 let pickableObjects = [];
 let pickableTiles = [];
-let pickableWalkingTiles = [];
+// let pickableWalkingTiles = [];
 let pickableWall = [];
 
 let sampledAgentData = [];
@@ -121,7 +119,7 @@ const tile = {
 const w = 10;
 const h = 45;
 const particle_distance = RADIUS * 2;
-const epsilon = 0.4;
+const epsilon = RADIUS + 0.2;
 const num_points = 40;
 
 let opening_size = 2;
@@ -178,10 +176,10 @@ function clean(){
 
 
     agentData.length = 0;
-    wallData.length = 0;
+    // wallData.length = 0;
     pickableObjects.length = 0;
     pickableTiles.length = 0;
-    pickableWalkingTiles.length = 0;
+    // pickableWalkingTiles.length = 0;
     pickableWall.length = 0;
     tiles.length = 0;
     sampledAgentData.length = 0;
@@ -206,20 +204,7 @@ function clean(){
 
 }
 
-// Math.seed = function(s) {
-//     let mask = 0xffffffff;
-//     let m_w  = (123456789 + s) & mask;
-//     let m_z  = (987654321 - s) & mask;
-//
-//     return function() {
-//         m_z = (36969 * (m_z & 65535) + (m_z >>> 16)) & mask;
-//         m_w = (18000 * (m_w & 65535) + (m_w >>> 16)) & mask;
-//
-//         let result = ((m_z << 16) + (m_w & 65535)) >>> 0;
-//         result /= 4294967296;
-//         return result;
-//     }
-// }
+
 
 function removeAllChildNodes(parent) {
     while (parent.firstChild) {
@@ -405,7 +390,19 @@ let text = {
     AgentNumber: num_points,
     Seed:1234,
     download: function() {
-        alert("clicked!")
+        if (global_frames.length > 0) {
+            // Convert the frames array to JSON
+            const json = JSON.stringify(global_frames);
+
+            // Download the JSON file
+            const link = document.createElement('a');
+            link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
+            link.setAttribute('download', `simulation.json`);
+            link.style.display = 'none';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     }
 };
 
@@ -431,7 +428,7 @@ menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function 
     gridization();
     // render();
 });
-menu.add(text, 'download').name('Download');
+menu.add(text, 'download').name('Download')
 
 const customContainer = document.getElementById('my-gui-container');
 customContainer.appendChild(gui.domElement);
@@ -699,16 +696,7 @@ function AStar(ts, start, end) {
 }
 
 function Walkable(startTile, endTile){
-    // const raycaster = new THREE.Raycaster();
-    // const origin = new THREE.Vector3(startTile.x, startTile.y, startTile.z);
-    // const destination = new THREE.Vector3(endTile.x, endTile.y, endTile.z);
-    //
-    // raycaster.set(origin, destination.clone().sub(origin).normalize());
-    //
-    // const intersects = raycaster.intersectObjects(pickableWall, false);
-    //
-    // return intersects.length <= 0;
-    // const boxSize = new THREE.Vector3(RADIUS*2, RADIUS*2, RADIUS*2);
+
     const ray = new THREE.Raycaster();
 
 
@@ -776,16 +764,12 @@ function gridization(){
 
     [rows, columns] = cut();
 
-
-
-
-
     const basicCost = 1;
     const obstacleCost = 10;
+
+
     for (let i = 0; i < rows; i++) {
         tiles[i] = [];
-
-
 
         for (let j = 0; j < columns; j++) {
 
@@ -804,65 +788,99 @@ function gridization(){
             }
 
             tiles[i][j] = new Tile(i, j, object_position.x, object_position.y, object_position.z, cost);
-        }
-    }
 
-
-    for (let i = 0; i< rows;i++){
-        for (let j = 0; j<columns;j++){
-            // Create a box geometry and a mesh material
-
-
-            let t = tiles[i][j];
-
-            const geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
+            let geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
 
             let material;
-            if (t.cost >= 10){
+            if (tiles[i][j].cost >= 10){
                 material = wall_material;
-
 
             }else {
                 material = transparency_material;
             }
 
-
-
-
-
             // Create a mesh by combining the geometry and the material
-            const cube = new THREE.Mesh(geometry, material);
+            let cube = new THREE.Mesh(geometry, material);
 
             // Set the mesh's name and userData properties
             cube.name = "MyCube_" + i + "_" + j;
             cube.userData = {
                 type: "box",
-                x: t.x,
-                y: t.y,
-                z: t.z,
-                r: t.r,
-                c: t.c,
+                x: tiles[i][j].x,
+                y: tiles[i][j].y,
+                z: tiles[i][j].z,
+
+                r: tiles[i][j].r,
+                c: tiles[i][j].c,
             };
-            cube.position.set(t.x, t.y, t.z);
+            cube.position.set(tiles[i][j].x, tiles[i][j].y, tiles[i][j].z);
 
 
-            if(t.cost >= 10){
+            if(tiles[i][j].cost >= 10){
                 pickableWall.push(cube);
-                wallData.push(cube.userData);
 
-            }else {
-                pickableWalkingTiles.push(cube);
             }
 
 
             pickableTiles.push(cube);
-
             // Add the mesh to the scene
             scene.add(cube);
-
         }
-
     }
+
+    // let geometry;
+    // let cube;
+    // let material;
+    //
+    // for (let i = 0; i< rows;i++){
+    //     for (let j = 0; j<columns;j++){
+    //         // Create a box geometry and a mesh material
+    //
+    //
+    //         let t = tiles[i][j];
+    //
+    //         geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
+    //
+    //         if (t.cost >= 10){
+    //             material = wall_material;
+    //
+    //         }else {
+    //             material = transparency_material;
+    //         }
+    //
+    //         // Create a mesh by combining the geometry and the material
+    //         cube = new THREE.Mesh(geometry, material);
+    //
+    //         // Set the mesh's name and userData properties
+    //         cube.name = "MyCube_" + i + "_" + j;
+    //         cube.userData = {
+    //             type: "box",
+    //             x: t.x,
+    //             y: t.y,
+    //             z: t.z,
+    //             r: t.r,
+    //             c: t.c,
+    //         };
+    //         cube.position.set(t.x, t.y, t.z);
+    //
+    //
+    //         if(t.cost >= 10){
+    //             pickableWall.push(cube);
+    //             wallData.push(cube.userData);
+    //
+    //         }else {
+    //             pickableWalkingTiles.push(cube);
+    //         }
+    //
+    //
+    //         pickableTiles.push(cube);
+    //
+    //         // Add the mesh to the scene
+    //         scene.add(cube);
+    //
+    //     }
+    //
+    // }
 
 }
 
@@ -937,7 +955,6 @@ function init() {
 
 
     sampledAgentData =  gaussianSampling();
-
 
 
     // scene
@@ -1068,183 +1085,6 @@ function init() {
             i += 1;
         }
     }
-    // var myrng = new Math.seedrandom('hello.');
-    // console.log(myrng());                // Always 0.9282578795792454
-    // console.log(myrng());
-
-    // function defaultAgentConfiguration(){
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: 45
-    //         }, {
-    //             x: -35,
-    //             z: 45
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: 40
-    //         }, {
-    //             x: -35,
-    //             z: 40
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: 35
-    //         }, {
-    //             x: -35,
-    //             z: 35
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: 30
-    //         }, {
-    //             x: -35,
-    //             z: 30
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: 25
-    //         }, {
-    //             x: -35,
-    //             z: 25
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: 20
-    //         }, {
-    //             x: -35,
-    //             z: 20
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: 15
-    //         }, {
-    //             x: -35,
-    //             z: 15
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: 10
-    //         }, {
-    //             x: -35,
-    //             z: 10
-    //         },
-    //         0.8, "X", );
-    //
-    //     // new agent
-    //     //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: 5
-    //         }, {
-    //             x: -35,
-    //             z: 5
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: 0
-    //         }, {
-    //             x: -35,
-    //             z: 0
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -5
-    //         }, {
-    //             x: -35,
-    //             z: -5
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -10
-    //         }, {
-    //             x: -35,
-    //             z: -10
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -15
-    //         }, {
-    //             x: -35,
-    //             z: -15
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -20
-    //         }, {
-    //             x: -35,
-    //             z: -20
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -25
-    //         }, {
-    //             x: -35,
-    //             z: -25
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -30
-    //         }, {
-    //             x: -35,
-    //             z: -30
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -35
-    //         }, {
-    //             x: -35,
-    //             z: -35
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 25,
-    //             z: -40
-    //         }, {
-    //             x: -35,
-    //             z: -40
-    //         },
-    //         0.8, "X", );
-    // }
-    // defaultAgentConfiguration();
 
     function addOneAgents(agentData, id,
                                  startPos, goalPos,
@@ -1290,24 +1130,9 @@ function init() {
     }
     loadFromAgentGUI();
 
-    // function loadFromAgentData(){
-    //     A.agentConfig().forEach(function(item, index){
-    //
-    //         addOneAgents(agentData, item.agent_id, {x:item.x, z:item.y}, {x:item.gx, z:item.gy}, 0.8);
-    //
-    //     });
-    // }
-    // loadFromAgentData();
 
 
 
-    let i = 0;
-    let deltaSpacing = 3;
-    let startX, startY, goalX, goalY;
-    startX = -25;
-    goalX = -25;
-    startY = -20
-    goalY = 20;
     world.distanceConstraints = [];
 
 
@@ -1365,25 +1190,6 @@ function init() {
 }
 
 
-
-// Handle the button click event
-function downloadSimData() {
-
-
-    if (global_frames.length > 0) {
-        // Convert the frames array to JSON
-        const json = JSON.stringify(global_frames);
-
-        // Download the JSON file
-        const link = document.createElement('a');
-        link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
-        link.setAttribute('download', `simulation.json`);
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-}
 
 function samplePointsBetweenPoints(points, m) {
     // Initialize an array to store the sampled points
@@ -1475,6 +1281,12 @@ function deepCloneArray(array) {
 function rightClick(event) {
 
     event.preventDefault();
+    performAStar();
+
+
+}
+
+function performAStar() {
 
     for (let i =0; i<agentData.length;i++){
 
@@ -1554,6 +1366,7 @@ function rightClick(event) {
 
 }
 
+
 function mouseDown(event) {
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
@@ -1581,8 +1394,7 @@ function render() {
 
 function animate() {
     requestAnimationFrame(animate);
-    PHY.step(RADIUS, agentData, pickableWall, world, wallData, WORLDUNIT);
-    // const frameNumber = parseInt(document.getElementById('frame').value);
+    PHY.step(RADIUS, agentData, pickableWall, world, WORLDUNIT);
 
     let baseFlag = true;
     agentData.forEach(function (agent, index){
@@ -1599,7 +1411,7 @@ function animate() {
     if (!baseFlag && global_frame_pointer < 10000){
 
         // Generate the frame data for the specified frame
-        const frameData = {
+        global_frames[global_frame_pointer] = {
             frame: global_frame_pointer,
             agents: agentData.map(agent => ({
                 id: agent.index,
@@ -1608,7 +1420,6 @@ function animate() {
                 z: agent.z,
             })),
         };
-        global_frames[global_frame_pointer] = frameData;
 
 
         global_frame_pointer++;
@@ -1642,5 +1453,6 @@ window.addEventListener("click", mouseDown, false);
 window.addEventListener("mousemove", mouseMove, false);
 window.addEventListener("contextmenu", rightClick, false);
 // document.getElementById('download-btn').addEventListener('click', downloadSimData, false);
-// render();
+// performAStar();
+render();
 animate();
