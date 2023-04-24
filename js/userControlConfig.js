@@ -30,6 +30,43 @@ class Tile {
     }
 }
 
+function generateCombinations(arrays, currentCombination = []) {
+    // base case: if there are no more arrays, return the current combination
+    if (arrays.length === 0) {
+        return [currentCombination];
+    }
+
+    const results = [];
+
+    // iterate over the elements of the first array
+    for (let i = 0; i < arrays[0].length; i++) {
+        // add the current element to the current combination
+        const nextCombination = [...currentCombination, arrays[0][i]];
+
+        // recursively generate combinations for the remaining arrays
+        const remainingArrays = arrays.slice(1);
+        const remainingCombinations = generateCombinations(remainingArrays, nextCombination);
+
+        // add the remaining combinations to the results
+        results.push(...remainingCombinations);
+    }
+
+    return results;
+}
+
+
+const paramArray = [
+    [15, 30, 17],
+    [10],
+    [2],
+    [41],
+    [1235]
+];
+const combinations = generateCombinations(paramArray);
+
+// console.log(combinations);
+let globalParamPointer = 0;
+
 
 
 // createGUI();
@@ -79,13 +116,16 @@ let tiles = [];
 let max_agents = 80;
 let ROWS = 0, COLUMNS = 0;
 
+
+let finish = false;
+
 function sliceArray(arr, S, E) {
     return arr.slice(S, E + 1);
 }
 
 function preAllocateAgents(){
 
-    let agentGeom, agentMaterial, agent;
+    let agentGeom,agentMaterial, agent;
 
     for (let i =0;i<max_agents;i++){
 
@@ -124,11 +164,6 @@ function preAllocateTiles(){
                 opacity: 0.0,
                 color: 0x00ff00 // set a color to see the transparent effect
             });
-            // if (tiles[i][j].cost >= 10){
-            //     material = tileMaterial;
-            // }else {
-            //     material = wallMaterial;
-            // }
 
             // Create a mesh by combining the geometry and the material
             let cube = new THREE.Mesh(geometry, material);
@@ -199,54 +234,10 @@ let goal_x_shift = 10;
 let goal_x = 0 + goal_x_shift;
 
 
-// renderer = new THREE.WebGLRenderer();
-// renderer.shadowMap.enabled = true;
-// renderer.shadowMap.type = THREE.PCFSoftShadowMap; //
-// renderer.setSize(window.innerWidth, window.innerHeight);
-// document.body.appendChild(renderer.domElement);
 
 function clean(){
 
-    // while(scene.children.length > 0){
-    //     scene.remove(scene.children[0]);
-    // }
-    //
-    //
-    // // console.log('dispose renderer!')
-    // renderer.dispose()
-    //
-    // scene.traverse(object => {
-    //     if (!object.isMesh) return
-    //
-    //     // console.log('dispose geometry!')
-    //     object.geometry.dispose()
-    //
-    //     if (object.material.isMaterial) {
-    //         cleanMaterial(object.material)
-    //     } else {
-    //         // an array of materials
-    //         for (const material of object.material) cleanMaterial(material)
-    //     }
-    // })
-    //
-    // const cleanMaterial = material => {
-    //     // console.log('dispose material!')
-    //     material.dispose()
-    //
-    //     // dispose textures
-    //     for (const key of Object.keys(material)) {
-    //         const value = material[key]
-    //         if (value && typeof value === 'object' && 'minFilter' in value) {
-    //             // console.log('dispose texture!')
-    //             value.dispose()
-    //         }
-    //     }
-    // }
-
-
-    // tiles.length = 0;
-    // pickableObjects.length = 0;
-
+    // console.log(text.Seed);
     agentData.length = 0;
     inactiveData.length = 0;
     wallData.length = 0;
@@ -257,20 +248,10 @@ function clean(){
     global_frames.length = 0; // An array to hold the frame data
     global_frame_pointer = 0;
 
-    // for (let prop in spotLights) {
-    //     if (spotLights.hasOwnProperty(prop)) {
-    //         delete spotLights[prop];
-    //     }
-    // }
 
-    // camera  = null;
+    // finish = true;
+
     selectedObject = selected = null;
-    // topTexture = null;
-
-
-
-    // removeAllChildNodes(document.body);
-
 
 }
 
@@ -407,35 +388,92 @@ function checkContainsTuple(base, checked){
 }
 
 
+function downloadData() {
+    if (global_frames.length > 0) {
+        // Convert the frames array to JSON
+        const json = JSON.stringify(global_frames);
+
+        const dataName = `seed#${text.Seed}_sd#${text.left_dist2opening}_gd#${text.right_dist2opening}_os#${text.opening}_an#${text.AgentNumber}.json`
+
+        // Download the JSON file
+        const link = document.createElement('a');
+        link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
+        link.setAttribute('download', dataName);
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+// define a function to start a new simulation
+function startNewSimulation() {
+
+
+    // console.log()
+    if (finish) {
+        // reset the simulationEnded flag
+
+        if(globalParamPointer !== 0){
+            downloadData();
+        }
+
+        if(globalParamPointer >= combinations.length){
+            // console.log(globalParamPointer);
+            alert("Finished");
+            return;
+        }
+
+        finish = false;
+
+        startDistSlider.setValue(combinations[globalParamPointer][0]);
+        goalDistSlider.setValue(combinations[globalParamPointer][1]);
+        openSizeSlider.setValue(combinations[globalParamPointer][2]);
+        agentNumSlider.setValue(combinations[globalParamPointer][3]);
+        randomSeedSlider.setValue(combinations[globalParamPointer][4]);
+
+        globalParamPointer++;
+
+
+    } else {
+        // wait and check again in 1 second
+        setTimeout(startNewSimulation, 1000);
+    }
+}
+
+
 let text = {
     left_dist2opening: start_x_shift,
     right_dist2opening: goal_x_shift,
     opening: opening.length,
     AgentNumber: num_points,
     Seed:1234,
-    download: function() {
-        if (global_frames.length > 0) {
-            // Convert the frames array to JSON
-            const json = JSON.stringify(global_frames);
+    download: downloadData,
 
-            // Download the JSON file
-            const link = document.createElement('a');
-            link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
-            link.setAttribute('download', `simulation.json`);
-            link.style.display = 'none';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+
+    auto: function (){
+        finish = true;
+
+        for (let i =0; i<combinations.length+1;i++){
+            startNewSimulation();
         }
+
+
+
+
+
+
     }
+
 };
 
-// let myRandomFunction = Math.seed(text.Seed);
-// let randomNumber = myRandomFunction();
+
 
 let gui = new GUI({ autoPlace: false });
 let menu = gui.addFolder('folder');
-menu.add(text, 'left_dist2opening', 15, 40).name('Dist2Start').onChange(function (){
+const startDistSlider = menu.add(text, 'left_dist2opening', 15, 40).name('Dist2Start').onChange(function (){
+    console.log("Changed");
+    console.log(finish);
     clean();
     sampledAgentData =  gaussianSampling();
     loadFromAgentGUI();
@@ -443,7 +481,7 @@ menu.add(text, 'left_dist2opening', 15, 40).name('Dist2Start').onChange(function
     changeOpening()
     performAStar();
 });
-menu.add(text, 'right_dist2opening', 10, 40).name('Dist2Goal').onChange(function (){
+const goalDistSlider = menu.add(text, 'right_dist2opening', 10, 40).name('Dist2Goal').onChange(function (){
     clean();
     sampledAgentData =  gaussianSampling();
     loadFromAgentGUI();
@@ -451,7 +489,7 @@ menu.add(text, 'right_dist2opening', 10, 40).name('Dist2Goal').onChange(function
     changeOpening()
     performAStar();
 });
-menu.add(text, 'opening',  1, 50).step(1).name('Opening Size').onChange(function (){
+const openSizeSlider = menu.add(text, 'opening',  1, 50).step(1).name('Opening Size').onChange(function (){
     clean();
     sampledAgentData =  gaussianSampling();
     loadFromAgentGUI();
@@ -459,7 +497,7 @@ menu.add(text, 'opening',  1, 50).step(1).name('Opening Size').onChange(function
     changeOpening()
     performAStar();
 });
-menu.add(text, 'AgentNumber',  10, max_agents).step(1).name('Agent Number').onChange(function (){
+const agentNumSlider = menu.add(text, 'AgentNumber',  10, max_agents).step(1).name('Agent Number').onChange(function (){
     clean();
     sampledAgentData =  gaussianSampling();
     loadFromAgentGUI();
@@ -467,7 +505,7 @@ menu.add(text, 'AgentNumber',  10, max_agents).step(1).name('Agent Number').onCh
     changeOpening()
     performAStar();
 });
-menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function (){
+const randomSeedSlider = menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function (){
     clean();
     sampledAgentData =  gaussianSampling();
     loadFromAgentGUI();
@@ -475,13 +513,20 @@ menu.add(text, 'Seed',  0, 65535).step(1).name('Random Seed').onChange(function 
     changeOpening()
     performAStar();
 });
-menu.add(text, 'download').name('Download')
+const downloadButton = menu.add(text, 'download').name('Download');
+menu.add(text, 'auto').name('Automate');
+
 
 const customContainer = document.getElementById('my-gui-container');
 customContainer.appendChild(gui.domElement);
 
 
+
+
+
+
 function gaussianSampling(){
+    console.log("Gaussian Sampled");
     const mx = 20;
     let real_x1, real_y1, real_x2, real_y2;
     let real_x, real_y;
@@ -603,6 +648,8 @@ function changeOpening(){
     opening = sliceArrayWithWindow(allobstacles, text.opening);
     obstacles = allobstacles.filter(x => !opening.includes(x));
 
+
+
     for (let i = 0; i < ROWS; i++) {
         for (let j = 0; j < COLUMNS; j++) {
             const index = i * ROWS + j;
@@ -610,24 +657,24 @@ function changeOpening(){
 
             if (checkContainsTuple(obstacles, [i, j])){
                 tiles[i][j].cost = 10;
-                pickableTiles[index].material = wallMaterial;
-                cubeInScene.material = wallMaterial;
+
+                pickableTiles[index].material.opacity = 1.0;
+                pickableTiles[index].material.color.set(0x333333);
+
+                cubeInScene.material.opacity = 1.0;
+                cubeInScene.material.color.set(0x333333);
 
                 pickableWall.push(pickableTiles[index]);
                 wallData.push(pickableTiles[index].userData);
 
             }else {
                 tiles[i][j].cost = 1;
-                pickableTiles[index].material =  new THREE.MeshStandardMaterial({
-                    transparent: true,
-                    opacity: 0.0,
-                    color: 0x00ff00 // set a color to see the transparent effect
-                });
-                cubeInScene.material = new THREE.MeshStandardMaterial({
-                    transparent: true,
-                    opacity: 0.0,
-                    color: 0x00ff00 // set a color to see the transparent effect
-                });
+
+                pickableTiles[index].material.opacity = 0.0;
+                pickableTiles[index].material.color.set(0x00ff00);
+
+                cubeInScene.material.opacity = 0.0;
+                cubeInScene.material.color.set(0x00ff00);
                 pickableWalkingTiles.push(pickableTiles[index]);
 
 
@@ -869,113 +916,11 @@ function gridization(){
 
 
 
-            // let cost;
-            // if (checkContainsTuple(obstacles, [i, j])){
-            //     cost = obstacleCost;
-            // }else {
-            //     cost = basicCost;
-            //
-            // }
-
             tiles[i][j] = new Tile(i, j, object_position.x, object_position.y, object_position.z, basicCost);
 
-        //     let geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
-        //
-        //     let material;
-        //     if (tiles[i][j].cost >= 10){
-        //         material = wall_material;
-        //
-        //     }else {
-        //         material = transparency_material;
-        //     }
-        //
-        //     // Create a mesh by combining the geometry and the material
-        //     let cube = new THREE.Mesh(geometry, material);
-        //
-        //     // Set the mesh's name and userData properties
-        //     cube.name = "MyCube_" + i + "_" + j;
-        //     cube.userData = {
-        //         type: "box",
-        //         x: tiles[i][j].x,
-        //         y: tiles[i][j].y,
-        //         z: tiles[i][j].z,
-        //
-        //         r: tiles[i][j].r,
-        //         c: tiles[i][j].c,
-        //     };
-        //     cube.position.set(tiles[i][j].x, tiles[i][j].y, tiles[i][j].z);
-        //
-        //
-        //     if(tiles[i][j].cost >= 10){
-        //         pickableWall.push(cube);
-        //         wallData.push(cube.userData);
-        //
-        //     }else {
-        //         pickableWalkingTiles.push(cube);
-        //     }
-        //
-        //
-        //     pickableTiles.push(cube);
-        //     // Add the mesh to the scene
-        //     scene.add(cube);
-        // }
+
         }
     }
-
-    // let geometry;
-    // let cube;
-    // let material;
-    //
-    // for (let i = 0; i< rows;i++){
-    //     for (let j = 0; j<columns;j++){
-    //         // Create a box geometry and a mesh material
-    //
-    //
-    //         let t = tiles[i][j];
-    //
-    //         geometry = new THREE.BoxGeometry(tile.w, WORLDUNIT * 2, tile.h);
-    //
-    //         if (t.cost >= 10){
-    //             material = wall_material;
-    //
-    //         }else {
-    //             material = transparency_material;
-    //         }
-    //
-    //         // Create a mesh by combining the geometry and the material
-    //         cube = new THREE.Mesh(geometry, material);
-    //
-    //         // Set the mesh's name and userData properties
-    //         cube.name = "MyCube_" + i + "_" + j;
-    //         cube.userData = {
-    //             type: "box",
-    //             x: t.x,
-    //             y: t.y,
-    //             z: t.z,
-    //             r: t.r,
-    //             c: t.c,
-    //         };
-    //         cube.position.set(t.x, t.y, t.z);
-    //
-    //
-    //         if(t.cost >= 10){
-    //             pickableWall.push(cube);
-    //             wallData.push(cube.userData);
-    //
-    //         }else {
-    //             pickableWalkingTiles.push(cube);
-    //         }
-    //
-    //
-    //         pickableTiles.push(cube);
-    //
-    //         // Add the mesh to the scene
-    //         scene.add(cube);
-    //
-    //     }
-    //
-    // }
-
 }
 
 // renderer
@@ -1081,49 +1026,6 @@ function init() {
 
     // world.distanceConstraints = [];
 
-    // let agentGeom, agentMaterial, agent;
-    //
-    //
-    // agentData.forEach(function(item, index) {
-    //
-    //
-    //     agentGeom = new THREE.CylinderGeometry(item.radius, item.radius, 4, 16);
-    //     agentMaterial = new THREE.MeshLambertMaterial({
-    //         color: 0xff0000
-    //     });
-    //
-    //     agent = new THREE.Mesh(agentGeom, agentMaterial);
-    //     agent.castShadow = true;
-    //     agent.receiveShadow = true;
-    //     agent.userData = {
-    //         "index": item.index,
-    //         "start_tile": null,
-    //         "end_tile": null
-    //     };
-    //     scene.add(agent);
-    //     // -----------------
-    //     //adding spotlight code
-    //     if(index ===0){
-    //         // spotLight = new THREE.SpotLight(0xffffff);
-    //         // spotLight.position.set(item.x, item.y + 6, item.z);
-    //         // spotLight.shadow.mapSize.width = 1024;
-    //         // spotLight.shadow.mapSize.height = 1024;
-    //         // spotLight.shadow.camera.near = 500;
-    //         // spotLight.shadow.camera.far = 4000;
-    //         // spotLight.shadow.camera.fov = 30;
-    //         // spotLight.intensity = 0.4;
-    //         // spotLight.angle = Math.PI / 8;
-    //         // spotLightTarget = new THREE.Object3D();
-    //         // scene.add(spotLightTarget);
-    //         // spotLight.target = spotLightTarget;
-    //         // scene.add(spotLight);
-    //         // spotLights[item.index] = spotLight;
-    //     }
-    //     // ----------------
-    //     item.agent = agent;
-    //     pickableObjects.push(agent);
-    // });
-
 
 }
 function addColumnAgentGroup(agentData, numAgents, spacing, startPos, goalPos, velocityMagnitude, direction) {
@@ -1218,11 +1120,11 @@ function loadFromAgentGUI(){
 function loadAgentMesh(){
 
     agentData.forEach(function (item){
-
         item.agent = scene.getObjectByName("Agent_" + item.index);
         item.agent.position.x = item.x;
         item.agent.position.y = item.y;
         item.agent.position.z = item.z;
+        item.agent.material.color.set(0xff0000);
 
     });
 
@@ -1231,6 +1133,7 @@ function loadAgentMesh(){
         item.agent.position.x = item.x;
         item.agent.position.y = item.y;
         item.agent.position.z = item.z;
+        item.agent.material.color.set(0xff0000);
 
     });
 
@@ -1458,9 +1361,7 @@ function animate() {
         baseFlag = baseFlag && agent.simEnd;
 
         if(agent.simEnd === true){
-            agent.agent.material = new THREE.MeshLambertMaterial({
-                color: 0x00ff00
-            });
+            agent.agent.material.color.set(0x00ff00);
         }
 
     })
@@ -1481,6 +1382,14 @@ function animate() {
 
 
         global_frame_pointer++;
+
+
+        finish = false;
+    }
+
+    if (baseFlag){
+        finish = true;
+
     }
 
 

@@ -295,6 +295,29 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT) 
 
             if(scalar < follower.density){
                 follower.density = scalar;
+                follower.waitAgent = followed;
+
+                const i2pi = [follower.px - follower.x, follower.pz - follower.z];
+                const mag_i2pi = Math.sqrt(i2pi[0]**2 + i2pi[1]**2);
+                // const unit_i2pi = getUnitVector({x: i2pi[0], y: i2pi[1]})
+
+                const i2pj = [followed.px - follower.x, followed.pz - follower.z];
+                // const mag_i2pj = Math.sqrt(i2pj[0]**2 + i2pj[1]**2);
+                const unit_i2pj = getUnitVector({x: i2pj[0], y: i2pj[1]})
+
+                // const distScalar = mag_pj2i / mag_pi2i;
+                const followPoint = {
+                    x: follower.x + unit_i2pj.x * mag_i2pi,
+                    z: follower.z + unit_i2pj.y * mag_i2pi
+                };
+
+                if (followPoint.x< 0 || followPoint.z < 0){
+                    console.log();
+                }
+
+                follower.px = followPoint.x;
+                follower.pz = followPoint.z;
+
             }
 
             // if (follower.index === 0){
@@ -311,7 +334,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT) 
 
         }else {
             follower.density = 1;
-
+            follower.waitAgent = null;
         }
 
 
@@ -322,6 +345,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT) 
 
         setScalar(agent_i, agent_j);
         setScalar(agent_j, agent_i);
+
+
 
         agent_i.px = agent_i.x + (agent_i.px - agent_i.x) * agent_i.density;
         agent_i.pz = agent_i.z + (agent_i.pz - agent_i.z) *  agent_i.density;

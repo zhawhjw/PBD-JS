@@ -665,6 +665,9 @@ function init() {
             path : null,
             path_index: 0,
             correction: false,
+            vm: Math.sqrt(vx * vx + vz * vz),
+
+            variance: getRandomFloat(0.5, 1.5, 1),
 
             move: true,
         });
@@ -1626,9 +1629,9 @@ function init() {
     }
 
     // debugConfiguration();
-    hallwayAgentConfiguration();
+    // hallwayAgentConfiguration();
     // singleHallwayAgentConfiguration();
-    // defaultAgentConfiguration();
+    defaultAgentConfiguration();
     // lineupConfiguration();
 
 
