@@ -55,12 +55,19 @@ function generateCombinations(arrays, currentCombination = []) {
 }
 
 
+let randomSeeds = [];
+
+for (let i = 0; i<=10000;i++){
+    randomSeeds.push(i);
+}
+console.log(randomSeeds);
+
 const paramArray = [
-    [15, 30, 17],
+    [15],
     [10],
     [2],
     [41],
-    [1235]
+    [...randomSeeds]
 ];
 const combinations = generateCombinations(paramArray);
 
@@ -426,10 +433,10 @@ function startNewSimulation() {
 
         finish = false;
 
-        startDistSlider.setValue(combinations[globalParamPointer][0]);
-        goalDistSlider.setValue(combinations[globalParamPointer][1]);
-        openSizeSlider.setValue(combinations[globalParamPointer][2]);
-        agentNumSlider.setValue(combinations[globalParamPointer][3]);
+        // startDistSlider.setValue(combinations[globalParamPointer][0]);
+        // goalDistSlider.setValue(combinations[globalParamPointer][1]);
+        // openSizeSlider.setValue(combinations[globalParamPointer][2]);
+        // agentNumSlider.setValue(combinations[globalParamPointer][3]);
         randomSeedSlider.setValue(combinations[globalParamPointer][4]);
 
         globalParamPointer++;
