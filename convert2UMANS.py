@@ -34,11 +34,11 @@ if __name__ == "__main__":
 
                 for agent in agents:
                     fr_xs.append(agent['x'])
-                    fr_ys.append(agent['y'])
+                    fr_ys.append(agent['z'])
 
                 dataframe[str(idx) + "_x"] = fr_xs
                 dataframe[str(idx) + "_y"] = fr_ys
 
                 # print(agents)
 
-            dataframe.to_csv(output_path + "/" + "sampling_" + str(len(AGENTS)) + "_agent_AStar.csv", header=False, index=False)
+            dataframe.to_csv(output_path + "/" + f.split(".")[0] + ".csv", header=False, index=False)
