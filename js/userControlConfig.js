@@ -66,7 +66,7 @@ const paramArray = [
     [15],
     [10],
     [2],
-    [41],
+    [30],
     [...randomSeeds]
 ];
 const combinations = generateCombinations(paramArray);
@@ -232,7 +232,7 @@ const w = 10;
 const h = 45;
 const particle_distance = RADIUS * 2;
 const epsilon = RADIUS + 0.2;
-const num_points = 41;
+const num_points = 30;
 
 let opening_size = 2;
 let start_x_shift = 40;
@@ -397,8 +397,12 @@ function checkContainsTuple(base, checked){
 
 function downloadData() {
     if (global_frames.length > 0) {
+
+        const sampledFrames = samplePoints(global_frames, 200)
+
+
         // Convert the frames array to JSON
-        const json = JSON.stringify(global_frames);
+        const json = JSON.stringify(sampledFrames);
 
         const dataName = `seed#${text.Seed}_sd#${text.left_dist2opening}_gd#${text.right_dist2opening}_os#${text.opening}_an#${text.AgentNumber}.json`
 
@@ -1148,7 +1152,28 @@ function loadAgentMesh(){
 
 }
 
+function samplePoints(vectors, n) {
+    // Calculate the step size between each sampled point
+    const step = 1 / (n - 1);
 
+    // Initialize the array of sampled points with the first vector
+    const sampledPoints = [vectors[0]];
+
+    // Loop over the range [step, 1-step) and sample a point at each step
+    for (let i = step; i < 1; i += step) {
+        // Calculate the index of the vector to sample
+        const index = Math.floor(i * (vectors.length - 1));
+
+        // Add the sampled vector to the array of sampled points
+        sampledPoints.push(vectors[index]);
+    }
+
+    // Add the last vector to the array of sampled points
+    sampledPoints.push(vectors[vectors.length - 1]);
+
+    // Return the array of sampled points
+    return sampledPoints;
+}
 
 
 function samplePointsBetweenPoints(points, m, a) {
@@ -1381,9 +1406,9 @@ function animate() {
             frame: global_frame_pointer,
             agents: agentData.map(agent => ({
                 id: agent.index,
-                x: agent.x,
+                x: parseFloat(agent.x.toFixed(2)),
                 y: agent.y,
-                z: agent.z,
+                z: parseFloat(agent.z.toFixed(2)),
             })),
         };
 
