@@ -1,3 +1,5 @@
 .idea/
 # not important file
 */positions.json
+groups.py
+visualize_points.py
