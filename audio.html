@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta charset="utf-8">
+<link type="text/css" rel="stylesheet" href="main.css">
+<title>Agent Dynamics Tutorial</title>
+<audio id="song" preload="auto" style="display: none">
+    <source src="resources/sounds/summer.mp3" type="audio/mpeg">
+</audio>
+<script type="importmap">
+  {
+    "imports": {
+      "three": "./build/three.module.js",
+      "three/addons/": "./examples/jsm/",
+      "simplePhysics": "./js/physics.js"
+    }
+  }
+</script>
+
+
+<script type="module">
+import * as THREE from 'three';
+import * as PHY from 'simplePhysics';
+import {
+    OrbitControls
+} from "three/addons/controls/OrbitControls.js";
+import {
+    GLTFLoader
+} from "three/addons/loaders/GLTFLoader.js";
+import {
+    DragControls
+} from 'three/addons/controls/DragControls.js';
+
+let clicked = false;
+let dragMode = false;
+let renderer, scene, camera, listener, audioLoader;
+let mesh;
+let draggedObject;
+let indexCounter = 0;
+let agnetGeometry, agentMaterial, agent, controls, dragControls;
+let raycaster;
+let pickableObjects = [];
+let gridObjects = [];
+
+let agentData = [];
+var mouse = new THREE.Vector2();
+const RADIUS = 1;
+
+let world = {
+    x: 40,
+    z: 40,
+    y: RADIUS,
+};
+
+function getParticleHeight() {
+    return 100 * RADIUS * Math.random();
+}
+/*  ------------------------  */
+
+const startButton = document.getElementById('startButton');
+startButton.addEventListener('click', init);
+
+function init() {
+    const overlay = document.getElementById('overlay');
+    overlay.remove();
+
+    // renderer
+    renderer = new THREE.WebGLRenderer();
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; //
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+    // scene
+    scene = new THREE.Scene();
+    // camera
+    const aspect = window.innerWidth / window.innerHeight;
+    const d = 30;
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+
+    camera.position.set(-67.26, 54.07, -3.77);
+    camera.rotation.order = 'YXZ';
+    camera.rotation.y = -1.6267;
+    camera.rotation.x = -0.46;
+
+    // ray casting
+    raycaster = new THREE.Raycaster();
+
+    // audio
+    const listener = new THREE.AudioListener();
+    camera.add(listener);
+    audioLoader = new THREE.AudioLoader();
+
+    // controls
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.addEventListener('change', render);
+    controls.enableZoom = false;
+    controls.enablePan = false;
+    controls.maxPolarAngle = Math.PI / 2;
+
+    // light
+    const light = new THREE.PointLight(0xffffff, 0.9, 0, 100000);
+    light.position.set(0, 50, 120);
+    light.castShadow = true;
+    light.shadow.mapSize.width = 512; // default
+    light.shadow.mapSize.height = 512; // default
+    light.shadow.camera.near = 0.5; // default
+    light.shadow.camera.far = 5000; // default
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.castShadow = true;
+    directionalLight.position.set(-5, 20, 4);
+    directionalLight.target.position.set(9, 0, -9);
+    directionalLight.shadow.camera.left *= 9;
+    directionalLight.shadow.camera.right *= 9;
+    directionalLight.shadow.camera.top *= 9;
+    directionalLight.shadow.camera.bottom *= 9;
+
+    scene.add(directionalLight);
+    const cameraHelper = new THREE.CameraHelper(directionalLight.shadow.camera);
+
+    // axes
+    scene.add(new THREE.AxesHelper(40));
+    const loader = new THREE.TextureLoader();
+    const texture = loader.load('resources/OIP.jpg');
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.magFilter = THREE.NearestFilter;
+    const repeats = 40 / 32;
+    texture.repeat.set(repeats, repeats);
+
+    // grid
+    const geometry = new THREE.PlaneGeometry(world.x, world.z, 10, 10);
+    //const material = new THREE.MeshBasicMaterial( {  opacity: 0.5, transparent: true } );
+    const material = new THREE.MeshPhongMaterial({
+        map: texture,
+        //side: THREE.DoubleSide,
+    });
+    const grid = new THREE.Mesh(geometry, material);
+    grid.castShadow = true; //default is false
+    grid.receiveShadow = true; //default  
+    grid.rotation.order = 'YXZ';
+    grid.rotation.y = -Math.PI / 2;
+    grid.rotation.x = -Math.PI / 2;
+    scene.add(grid);
+    gridObjects.push(grid);
+    const sound1 = new THREE.PositionalAudio(listener);
+    const songElement = document.getElementById('song');
+    sound1.setMediaElementSource(songElement);
+    sound1.setRefDistance(20);
+    songElement.play();
+    grid.add(sound1);
+
+
+    let i = 0,
+        j = 0;
+    let deltaSpacing = 5;
+    let startX, startY, goalX, goalY;
+    startX = -25;
+    goalX = -25;
+    startY = -30
+    goalY = 30;
+    while (i < 18) {
+        j = 0;
+        while (j < 18) {
+            agentData.push({
+                index: indexCounter,
+                x: (-world.x / 2) + RADIUS + j * 2 * (RADIUS * 1.1),
+                y: 30 + j, //getParticleHeight(),
+                z: (-world.z / 2) + RADIUS + i * 2 * (RADIUS * 1.1),
+                goal_x: 0.0,
+                goal_y: 0.0,
+                goal_z: 0.0,
+                /*  TODO modify lines below  */
+                vx: 0.0,
+                vy: 0.0,
+                vz: 0.0,
+                /*  -------------------------- */
+                radius: RADIUS,
+                invmass: 1
+            })
+            j += 1;
+            indexCounter += 1;
+            //break;
+        }
+        i += 1;
+        //break;
+    }
+
+    let jumpSound;
+
+    audioLoader.load('resources/sounds/jumpland48000.mp3', (buffer) => {
+        agentData.forEach(function(item) {
+            jumpSound = new THREE.PositionalAudio(listener);
+            jumpSound.setBuffer(buffer);
+            jumpSound.setVolume(1);
+            jumpSound.setRefDistance(20);
+            //jumpSound.play();
+            item.sound = jumpSound;
+
+            agnetGeometry = new THREE.SphereGeometry(1, 32, 16);
+            agentMaterial = new THREE.MeshLambertMaterial({
+                color: 0x00ff00
+            });
+            agent = new THREE.Mesh(agnetGeometry, agentMaterial);
+            agent.castShadow = true;
+            agent.receiveShadow = true;
+            scene.add(agent);
+            pickableObjects.push(agent);
+            item.agent = agent;
+            agent.agentData = item;
+            agent.add(jumpSound);
+        });
+    });
+    document.addEventListener('jumpEvent', (e) => {
+
+        /*
+        TODO and content here as needed
+        if .... 
+        e.detail.object.sound.play();
+        */
+
+    });
+
+    animate();
+}
+
+function render() {
+    renderer.render(scene, camera);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function onMouseMove(event) {
+    event.preventDefault();
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    clicked = true;
+}
+
+function onMouseDown(event) {
+    event.preventDefault();
+}
+
+
+function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
+    PHY.step(RADIUS, agentData, world)
+    agentData.forEach(function(member) {
+        if (member.agent != undefined) {
+            member.agent.position.x = member.x;
+            member.agent.position.y = member.y;
+            member.agent.position.z = member.z;
+        }
+    });
+    renderer.render(scene, camera);
+};
+
+</script>
+
+
+</head>
+
+<body style="margin:0;background:black;text-align:left;">
+<div id="overlay">
+    <button id="startButton">Play</button>
+</div>
+</body>
+</html>

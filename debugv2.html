@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html><head>
+  <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+  <meta charset="utf-8">
+  <title>Agent Dynamics Tutorial</title>
+
+
+
+
+
+</head>
+
+<body style="margin:0;background:black;text-align:left;">
+<!--<form>-->
+<!--  <label for="frame">Frame:</label>-->
+<!--  <input type="number" id="frame" name="frame" value="100" style="float: right;">-->
+<!--  <button type="button" id="download-btn" style="float: right;">Download</button>-->
+<!--</form>-->
+
+<div class="zoom-wrapper">
+  <div class="zoom-bar">
+    <button type="button" id="zoom-out" style="float: right;">-</button>
+    <button type="button" id="zoom-in" style="float: right;">+</button>
+  </div>
+</div>
+
+
+<script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@v0.149.0/build/three.module.js",
+
+          "three/addons/": "https://unpkg.com/three@v0.149.0/examples/jsm/",
+          "simplePhysics": "./js/userControlPBDv2.js",
+          "agentConfiguration" : "./js/positions.js",
+          "fontConfig" : "./js/fontConfig.js"
+
+
+        }
+      }
+    </script>
+
+<script type="module" src="./js/debugv2.js" ></script>
+
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
