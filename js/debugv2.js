@@ -197,9 +197,24 @@ function arrayContainsArray(arr, obj) {
 function downloadWallData(scenarioName) {
     if (obstacles.length > 0) {
         // Convert the frames array to JSON
-        const json = JSON.stringify(obstacles);
 
-        const dataName = `${scenarioName}.json`
+        let exported = [];
+        obstacles.forEach(function (t){
+           let _t = tiles[t[0]][t[1]];
+
+            let obstacle_data = {
+                x: _t.x,
+                z: _t.z,
+                unit: WORLDUNIT * 2
+            }
+           exported.push(obstacle_data);
+
+
+        });
+
+        const json = JSON.stringify(exported);
+
+        const dataName = `${scenarioName}_wall.json`
 
         // Download the JSON file
         const link = document.createElement('a');
@@ -1111,7 +1126,8 @@ function init() {
                 currentC:-1,
                 openFlag:false,
 
-                noFollowingTimer:-1
+                noFollowingTimer:-1,
+                freezeTimer:-1
 
             });
             i += 1;
@@ -2310,23 +2326,23 @@ const global_frames = []; // An array to hold the frame data
 let global_frame_pointer = 0;
 
 // Handle the button click event
-// function downloadSimData() {
-//     // const frameNumber = parseInt(document.getElementById('frame').value);
-//
-//     if (global_frames.length > 0) {
-//         // Convert the frames array to JSON
-//         const json = JSON.stringify(global_frames);
-//
-//         // Download the JSON file
-//         const link = document.createElement('a');
-//         link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
-//         link.setAttribute('download', `simulation.json`);
-//         link.style.display = 'none';
-//         document.body.appendChild(link);
-//         link.click();
-//         document.body.removeChild(link);
-//     }
-// }
+function downloadSimData() {
+    // const frameNumber = parseInt(document.getElementById('frame').value);
+
+    if (global_frames.length > 0) {
+        // Convert the frames array to JSON
+        const json = JSON.stringify(global_frames);
+
+        // Download the JSON file
+        const link = document.createElement('a');
+        link.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(json));
+        link.setAttribute('download', `simulation.json`);
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
 
 function samplePointsBetweenPoints(points, m) {
     // Initialize an array to store the sampled points
@@ -2743,15 +2759,6 @@ function updateCostInMap(ts, r, c, change){
 function animate() {
     requestAnimationFrame(animate);
 
-    // for (let i = 0; i< rows;i++) {
-    //     for (let j = 0; j < columns; j++) {
-    //         // Create a box geometry and a mesh material
-    //
-    //         tiles[i][j].cost = originalTiles[i][j].cost;
-    //
-    //
-    //     }
-    // }
 
     agentData.forEach(function(member, index){
         let actual_position = {
@@ -2787,18 +2794,34 @@ function animate() {
         }
         member.openFlag = openFlag;
 
-        // opens.forEach(function (o){
-        //     if(openFlag){
-        //         return;
-        //     }
-        //
-        //     if(arrayContainsArray(o)){
-        //         openFlag = true
-        //     }
-        //
-        // });
 
     });
+
+    // data render
+    // if (global_frame_pointer < 10000){
+    //
+    //     // Generate the frame data for the specified frame
+    //     global_frames[global_frame_pointer] = {
+    //         frame: global_frame_pointer,
+    //         agents: agentData.map(agent => ({
+    //             id: agent.index,
+    //             x: parseFloat(agent.x.toFixed(2)),
+    //             y: agent.y,
+    //             z: parseFloat(agent.z.toFixed(2)),
+    //         })),
+    //     };
+    //
+    //
+    //     global_frame_pointer++;
+    //
+    // }else if(global_frame_pointer === 10000) {
+    //     downloadSimData()
+    //     global_frame_pointer++;
+    // }else {
+    //     // do nothing
+    // }
+
+
 
     PHY.step(RADIUS, agentData, pickableWall, world, WORLDUNIT, plannerMode, tiles, exits );
     // const frameNumber = parseInt(document.getElementById('frame').value);
@@ -3208,11 +3231,46 @@ function createFF(){
     }
 }
 
+function startNewSimulation() {
+
+    if (finish) {
+        // reset the simulationEnded flag
+
+        if(globalParamPointer !== 0){
+            downloadData();
+        }
+
+        if(globalParamPointer >= combinations.length){
+            // console.log(globalParamPointer);
+            alert("Finished");
+            return;
+        }
+
+        // finish = false;
+
+        // startDistSlider.setValue(combinations[globalParamPointer][0]);
+        // goalDistSlider.setValue(combinations[globalParamPointer][1]);
+        // openSizeSlider.setValue(combinations[globalParamPointer][2]);
+        // agentNumSlider.setValue(combinations[globalParamPointer][3]);
+        randomSeedSlider.setValue(combinations[globalParamPointer][4]);
+
+        globalParamPointer++;
+
+
+    } else {
+        // wait and check again in 1 second
+        setTimeout(startNewSimulation, 1000);
+    }
+}
+
+
+
 
 init();
 createPBDMatrix();
 gridization();
 // createFF();
+// downloadWallData("escape");
 render();
 animate();
 let intervalId = window.setInterval(function(){
