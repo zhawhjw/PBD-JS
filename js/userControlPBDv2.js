@@ -1,4 +1,4 @@
-
+import * as THREE from 'three';
 
 export function distance(x1, y1, x2, y2) {
     return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
@@ -448,13 +448,18 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     // }
 
 
-
+    function isAgentInFront(agentA, agentB, direction) {
+        const difference = agentB.clone().sub(agentA);
+        const angle = difference.angleTo(direction);
+        return angle < Math.PI / 3; // Adjust this angle to control the "field of view" for agents.
+    }
 
 
     function closestSeeAgent(point, points) {
         let closest = null;
         let minDistance = Infinity;
-        const activate_dist =   point.variance;
+        // const activate_dist =   point.variance;
+        const activate_dist =   0.5;
 
         for (let i = 0; i < points.length; i++) {
             const checkedPoint = points[i];
@@ -480,17 +485,24 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             const dir = {x: checkedPoint.x - point.x, y:checkedPoint.z - point.z};
             const followed_ud = getUnitVector(dir);
             const follower_uv = getUnitVector({x: point.vx, y:point.vz});
+            const followed_uv = getUnitVector({x: checkedPoint.vx, y:checkedPoint.vz});
+
             const follower_ug = getUnitVector({x: point.goal_x - point.x, y:point.goal_z - point.z});
             const followed_ug = getUnitVector({x: checkedPoint.goal_x - checkedPoint.x, y:checkedPoint.goal_z - checkedPoint.z});
 
+            const follower_position = new THREE.Vector3( point.x, 0, point.z );
+            const checkedPoint_position = new THREE.Vector3( checkedPoint.x, 0, checkedPoint.z );
+
+            const follower_dir = new THREE.Vector3( point.vx, 0, point.vz );
+            const direction = follower_dir.normalize();
+
             let flag1 = (agentCentroidDist - 2 * RADIUS) < activate_dist; // censor distance range
-            // let flag1 = d < 5; // censor distance range
-            let flag2 = (degreeBetween(follower_ug, followed_ud) < 30); // censor angle range
-            let flag3 = (degreeBetween(follower_ug, followed_ug) > 100); // to solve face to face condition
-            // let flag3 = false;
-            // let flag4 = (degreeBetween(follower_ug, followed_ug) < 30);
-            // let flag3 = (degreeBetween(follower_ug, followed_ug) < 60 ); // to solve face to face condition
-            if (agentCentroidDist < minDistance && flag1 && flag2 && !flag3) {
+
+            // let flag2 = (degreeBetween(follower_ug, followed_ud) < 30); // censor angle range
+            // let flag3 = (degreeBetween(follower_ug, followed_ug) > 100); // to solve face to face condition
+            let flag2 = isAgentInFront(follower_position, checkedPoint_position, direction)
+            let flag3 = false;
+            if ((agentCentroidDist < minDistance) && flag1 && flag2 && !flag3) {
                 minDistance = agentCentroidDist;
                 closest = checkedPoint;
             }
@@ -506,14 +518,14 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             let followedAgent = closestSeeAgent(item, sceneEntities);
 
 
-
-            if(item.simEnd){
-                followedAgent = null;
-            }
-
-            if (followedAgent && followedAgent.simEnd){
-                followedAgent = null;
-            }
+            //
+            // if(item.simEnd){
+            //     followedAgent = null;
+            // }
+            //
+            // if (followedAgent && followedAgent.simEnd){
+            //     followedAgent = null;
+            // }
 
             // if(followedAgent && followedAgent.x >= item.x){
             //     followedAgent = null;
@@ -523,26 +535,23 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
                 followedAgent = null;
             }
 
-            let min = 0;
-            let max = 1;
-            let timerMax = 30;
-            let randomFloatInRange = (Math.random() * (max - min) + min).toFixed(1);
-
-            if(randomFloatInRange <= 0.1){
-
-                if(item.noFollowingTimer <= -1){
-                    item.noFollowingTimer = timerMax;
-                }
-            }
-
-            if(item.noFollowingTimer > -1){
-                item.noFollowingTimer -= 1
-                followedAgent = null;
-            }
-
-            // if(item.exVec.x !== 0 || item.exVec.z !== 0){
+            // let min = 0;
+            // let max = 1;
+            // let timerMax = 30;
+            // let randomFloatInRange = (Math.random() * (max - min) + min).toFixed(1);
+            //
+            // if(randomFloatInRange <= 0.1){
+            //
+            //     if(item.noFollowingTimer <= -1){
+            //         item.noFollowingTimer = timerMax;
+            //     }
+            // }
+            //
+            // if(item.noFollowingTimer > -1){
+            //     item.noFollowingTimer -= 1
             //     followedAgent = null;
             // }
+
 
 
 
@@ -583,11 +592,12 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             followedAgent = null;
         }
 
+
         let min = 0;
         let max = 1;
-        let timerMax = 50;
+        let timerMax = 80;
         let randomFloatInRange = (Math.random() * (max - min) + min).toFixed(1);
-        let probability = 0.3
+        let probability = 0.5
 
         if(randomFloatInRange <= probability){
 
@@ -602,6 +612,13 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         }
 
         agent_i.waitAgent = followedAgent;
+
+        // you go first
+        if(agent_i.waitAgent !== null && agent_i.waitAgent.index === agent_i.index ){
+            agent_i.waitAgent = null;
+        }
+
+
         if(agent_i.waitAgent){
 
             let distToGoal = distance(agent_i.x, agent_i.z, agent_i.waitAgent.x, agent_i.waitAgent.z );
@@ -625,6 +642,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             let scalar = normalize(agent_i.minVariance, activate_dist, delta);
             agent_i.px = agent_i.x + (agent_i.px - agent_i.x) *  scalar;
             agent_i.pz = agent_i.z + (agent_i.pz - agent_i.z) *  scalar;
+
             // let zeroTimer = 30;
             // if (scalar <= 0){
             //     // console.log("Hit 0");
@@ -856,6 +874,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             const dir_z = velocity.z;
             item.vx = item.v_pref * dir_x;
             item.vz = item.v_pref * dir_z;
+            // item.vx = 0.8 * dir_x;
+            // item.vz = 0.8 * dir_z;
 
             item.currentR = r;
             item.currentC = c;
@@ -879,7 +899,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     const epsilon = 0.0001;
     const timestep = 0.03;
     const ITERNUM =3;
-    const KSI = 0.02;
+    const KSI = 0.5;
 
 
     sceneEntities.forEach(function (item){
@@ -901,6 +921,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         // if (!x_sign) item.prev_vx = 0;
         // if (!z_sign) item.prev_vz = 0;
 
+        // need to be revised
         item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
         item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
 
@@ -910,37 +931,342 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
     });
 
+    const AVOID_RADIUS = 2.5;
+    function getNearbyAgents(agent, agents) {
+        return agents.filter(other => {
+            if (agent === other) return false;
+            const dx = other.px - agent.px;
+            const dy = other.pz - agent.pz;
+            return Math.sqrt(dx*dx + dy*dy) < AVOID_RADIUS;
+        });
+    }
+    function avoidCollision(agent, agents) {
+        const nearbyAgents = getNearbyAgents(agent, agents);
+        let steerX = 0;
+        let steerY = 0;
+
+        nearbyAgents.forEach(other => {
+            const dx = agent.px - other.px;
+            const dy = agent.pz - other.pz;
+            const distance = Math.sqrt(dx*dx + dy*dy);
+
+            // The closer the other agent is, the stronger the steering force
+            const force = (AVOID_RADIUS - distance) / AVOID_RADIUS;
+            steerX += dx / distance * force;
+            steerY += dy / distance * force;
+        });
+
+        // Here you can normalize the steering force if needed, and also add limits
+        // so that agents don't take too sharp turns or too fast movements
+
+        agent.px += steerX;
+        agent.pz += steerY;
+    }
+
 
     let pbdIters = 0;
     let agent_a, agent_b, desDistance, i, j, idx = 0;
 
+    function collisionAvoidance(agentA, agentB) {
+
+        let temporary_goal = opens[0];
+
+        const agentCentroidDist = distance(agentA.px, agentA.pz, agentB.px, agentB.pz );
+        const collisonAgentSize =  AGENTSIZE;
+
+        const agentA2exit = distance(agentA.px, agentA.pz, temporary_goal.x, temporary_goal.z );
+        const agentB2exit = distance(agentB.px, agentB.pz, temporary_goal.x, temporary_goal.z );
+
+
+        if(agentCentroidDist <= collisonAgentSize){
+
+            if(agentA2exit< agentB2exit){
+                agentB.px = agentB.x;
+                agentB.pz = agentB.z;
+
+            }else if(agentA2exit > agentB2exit){
+                agentA.px = agentA.x;
+                agentA.pz = agentA.z;
+
+            }else {
+                agentB.px = agentB.x;
+                agentB.pz = agentB.z;
+                agentA.px = agentA.x;
+                agentA.pz = agentA.z;
+            }
+
+        }
+
+        // const AgentDist = agentCentroidDist - collisonAgentSize;
+        //
+        // // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, expected_goal.x, expected_goal.z );
+        // // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, expected_goal.x, expected_goal.z );
+        // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, agent_i.goal_x, agent_i.goal_z );
+        // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, agent_j.goal_x, agent_j.goal_z );
+        //
+        //
+        // const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
+        // const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
+        //
+        //
+        // let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+        // let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+        //
+        //
+        //
+        // if(agentCentroidDist - collisonAgentSize < 0) {
+        //
+        //     if (agent_i_goal_distance > agent_j_goal_distance) {
+        //         agent_i_scaler = agent_i_scaler * 2;
+        //
+        //     } else if (agent_i_goal_distance < agent_j_goal_distance) {
+        //         agent_j_scaler = agent_j_scaler * 2;
+        //
+        //     }
+        //
+        //     agent_i.px += agent_i_scaler * dir_x;
+        //     agent_i.pz += agent_i_scaler * dir_z;
+        //     agent_j.px += -agent_j_scaler * dir_x;
+        //     agent_j.pz += -agent_j_scaler * dir_z;
+
+    }
+
+    function coordinateCorrection(r, c){
+        if(r>69){
+            r = 69;
+        }
+        if(c>69){
+            c = 69;
+        }
+        if(r<0){
+            r = 0;
+
+        }
+        if(c<0){
+            c = 0;
+        }
+
+        return [r, c]
+
+    }
+
+    function searchCandidateTiles(flowFieldDir, r, c){
+
+        let xDir = flowFieldDir[0];
+        let yDir = flowFieldDir[1];
+
+        let candidates = [];
+
+        let nr;
+        let nc;
+
+        if (xDir > 0 && yDir === 0){
+            // x
+            // |
+            //ooo
+            [nr, nc] = coordinateCorrection(r-1, c);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c-1);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c+1);
+            candidates.push([nr, nc]);
+
+        }else if (xDir === 0 && yDir < 0) {
+            // o
+            // o - x
+            // o
+            [nr, nc] = coordinateCorrection(r+1, c-1);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r, c-1);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c-1);
+            candidates.push([nr, nc]);
+        }else if (xDir === 0 && yDir > 0) {
+            //     o
+            // x - o
+            //     o
+            [nr, nc] = coordinateCorrection(r+1, c+1);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r, c+1);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c+1);
+            candidates.push([nr, nc]);
+        }else if (xDir > 0 && yDir > 0) {
+            // x   o
+            //   \
+            // o   o
+            [nr, nc] = coordinateCorrection(r-1, c);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c+1);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r, c+1);
+            candidates.push([nr, nc]);
+        }else if (xDir < 0 && yDir < 0) {
+            // o   x
+            //   /
+            // o   o
+            [nr, nc] = coordinateCorrection(r-1, c);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c-1);
+            candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c);
+            candidates.push([nr, nc]);
+        }else {
+            // other conditions should not exist
+            // do nothing
+
+            nr = r;
+            nc = c;
+
+        }
+
+
+        return candidates
+
+    }
+
+    function filterCandidates(candidatesList, targetTile){
+
+
+
+        for(let i =0;i<candidatesList.length;i++){
+            // candidatesList[i]
+        }
+
+    }
+
+    function filterArrayByDistance(points, currentPosition, goalPosition) {
+        const distanceBetweenAB = distance(currentPosition.x, currentPosition.y, goalPosition.z, goalPosition.z);
+
+        return points.filter(point => {
+            const distanceToPointFromB = distance(point.x, point.z, goalPosition.x, goalPosition.z);
+            return distanceToPointFromB < distanceBetweenAB;
+        });
+    }
+
+    function fillGap(item){
+
+        let actual_position = {
+            x: item.x + world.x / 2,
+            y: item.y,
+            z: item.z + world.z / 2,
+
+        }
+
+        let [r, c] = convertWorld2Grid(actual_position);
+
+
+        item.nowPosition = [r, c]
+
+        // find next candidate tiles
+
+        // let current_vec = field[r][c].vec;
+        // let candidates = searchCandidateTiles(current_vec, r, c);
+        // let filterCandidates = filterCandidates(candidates,  opens[0]);
+
+
+
+        if(r < 1){
+            item.nextPosition = null;
+            return;
+        }
+
+        let candidates = [];
+        let nr, nc;
+        //  x
+        // ooo
+        [nr, nc] = coordinateCorrection(r-1, c);
+        let desired_tile1 = field[nr][nc];
+        candidates.push(desired_tile1);
+
+        [nr, nc] = coordinateCorrection(r-1, c-1);
+        let desired_tile2 = field[nr][nc];
+        candidates.push(desired_tile2);
+
+        [nr, nc] = coordinateCorrection(r-1, c+1);
+        let desired_tile3 = field[nr][nc];
+        candidates.push(desired_tile3);
+
+
+        let filtered = filterArrayByDistance(candidates, field[r][c], opens[0])
+        if(filtered < 1){
+            item.nextPosition = null;
+            return;
+        }
+        let nextTile = filtered[0];
+
+
+
+        item.nextPosition = [nextTile.r, nextTile.c]
+
+        if(nextTile.cost  > 1){
+            return;
+        }
+
+        item.waitAgent = null;
+
+        let distToGoal = distance(item.x, item.z, nextTile.x, nextTile.z );
+
+        if (distToGoal < 0.01){
+            distToGoal = 0.01;
+        }
+
+        const dir_x = (nextTile.x- item.x)/distToGoal;
+        const dir_z = (nextTile.z- item.z)/distToGoal;
+
+        item.vx = item.v_pref * dir_x;
+        item.vz = item.v_pref * dir_z;
+
+        item.px = item.x + timestep*item.vx;
+        item.pz = item.z + timestep*item.vz;
+
+        item.nextTarget = [item.px, item.pz]
+
+
+    }
 
     // found proper leader for each agent
     // findLeader();
     sceneEntities.forEach(function (item){
-        followingV3(item);
+        // followingV3(item);
     });
+
+
+    sceneEntities.forEach(function (item){
+        // fillGap(item);
+        // avoidCollision(item, sceneEntities);
+    });
+
+
+    i=0;
+    while(i<sceneEntities.length)
+    {
+        j=i+1;
+
+        while(j<sceneEntities.length)
+        {
+
+            collisionAvoidance(sceneEntities[i],sceneEntities[j]);
+            // collisionConstraint(sceneEntities[i],sceneEntities[j]);
+            j+=1;
+        }
+        i+=1
+    }
+
+
 
     while(pbdIters<ITERNUM)
     {
-
-        i=0;
-        while(i<sceneEntities.length)
-        {
-
-
-
-            j=i+1;
-
-            while(j<sceneEntities.length)
-            {
-
-                collisionConstraint(sceneEntities[i],sceneEntities[j]);
-
-                j+=1;
-            }
-            i+=1
-        }
 
         i=0;
         while(i<sceneEntities.length)

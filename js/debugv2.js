@@ -7,8 +7,11 @@ import {FontLoader} from 'three/addons/loaders/FontLoader.js';
 import {makeFlowField} from "./flowField.js";
 
 // console.log(makeFlowField());
+let INTERSECTED;
+let INTERSECTED_FOLLOWED;
 
-
+const pointer = new THREE.Vector2();
+let isPlay = true;
 
 class Tile {
 
@@ -968,7 +971,7 @@ function init() {
     scene.add(directionalLight);
 
     // axes
-    scene.add(new THREE.AxesHelper(40));
+    // scene.add(new THREE.AxesHelper(40));
     const loader = new THREE.TextureLoader();
     const texture = loader.load('resources/OIP.jpg');
     texture.wrapS = THREE.RepeatWrapping;
@@ -1067,7 +1070,9 @@ function init() {
                 vx: vx,
                 vy: 0.0,
                 vz: vz,
-                v_pref: velocityMagnitude,
+                // v_pref: velocityMagnitude,
+                v_pref: 0.8,
+
                 radius: RADIUS,
                 invmass: 0.5,
                 group_id: g_id,
@@ -2305,6 +2310,7 @@ function init() {
         }
         // ----------------
         item.agent = agent;
+        agent.currentHex = agent.material.emissive.getHex();
         pickableObjects.push(agent);
 
     });
@@ -2418,12 +2424,14 @@ function onWindowResize() {
 
 function mouseMove(event) {
     event.preventDefault();
-    if (event.code === 'Enter') {
-        var mouseX = event.clientX;
-        var mouseY = event.clientY;
-        // console.log('Mouse position:', mouseX, mouseY);
-    }
+    // if (event.code === 'Enter') {
+    //     var mouseX = event.clientX;
+    //     var mouseY = event.clientY;
+    //     // console.log('Mouse position:', mouseX, mouseY);
+    // }
 
+    pointer.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+    pointer.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
 }
 
@@ -2563,35 +2571,19 @@ function mouseDown(event) {
 
 
     selected = null;
-    var intersects = raycaster.intersectObjects(pickableObjects, false);
-    for (var i = 0; i < intersects.length; i++) {
-        /* TODO finish this part as
-         */
-        selectedObject = intersects[i].object;
-        selected = selectedObject.userData.index;
-        console.log(agentData[selected]);
+    let intersects = raycaster.intersectObjects(pickableObjects, false);
+    for (let i = 0; i < intersects.length; i++) {
 
-        // if (agentData[selected].interrupt){
-        //     agentData[selected].goal_x = agentData[selected].backup[0];
-        //     agentData[selected].goal_z = agentData[selected].backup[1];
-        //     agentData[selected].path_index = agentData[selected].backup[2];
-        //     // agentData[selected].simEnd = agentData[selected].backup[3];
-        //     agentData[selected].path = agentData[selected].backupPath;
-        //     agentData[selected].interrupt = false;
-        //
-        // }else {
-        //     agentData[selected].backup[0] = agentData[selected].goal_x;
-        //     agentData[selected].backup[1] = agentData[selected].goal_z;
-        //     agentData[selected].backup[2] = agentData[selected].path_index;
-        //     agentData[selected].backup[3] = agentData[selected].simEnd;
-        //     agentData[selected].backupPath = agentData[selected].path;
-        //
-        //     agentData[selected].goal_x = agentData[selected].x;
-        //     agentData[selected].goal_z = agentData[selected].z;
-        //     agentData[selected].path = null;
-        //     // agentData[selected].simEnd = true;
-        //     agentData[selected].interrupt = true;
-        // }
+        selectedObject = intersects[i].object;
+
+        selected = selectedObject.userData.index;
+
+
+        // selectedObject.material.emissive.setHex( 0xff0000 );
+
+
+
+        console.log(agentData[selected]);
 
 
 
@@ -2602,6 +2594,26 @@ function mouseDown(event) {
 
 const zoomInButton = document.getElementById("zoom-in");
 const zoomOutButton = document.getElementById("zoom-out");
+const pauseButton = document.getElementById("pauseButtonId");
+
+// Start Button
+pauseButton.onclick = function StartAnimation() {
+
+    // Start and Pause
+    if (isPlay) {
+        pauseButton.innerHTML = 'Restart';
+
+        isPlay = false;
+
+    } else {
+        pauseButton.innerHTML = 'Pause';
+
+        isPlay = true;
+
+    }
+
+    animate();
+}
 
 const zoomInFunction = (e) => {
     const fov = getFov();
@@ -2757,7 +2769,11 @@ function updateCostInMap(ts, r, c, change){
 }
 
 function animate() {
+
+
+    if (!isPlay) return;
     requestAnimationFrame(animate);
+    interaction();
 
 
     agentData.forEach(function(member, index){
@@ -2797,7 +2813,7 @@ function animate() {
 
     });
 
-    // data render
+    // data download
     // if (global_frame_pointer < 10000){
     //
     //     // Generate the frame data for the specified frame
@@ -2985,9 +3001,6 @@ function animate() {
         }
     });
 
-    // pickableTiles[0].material.color.set("#00ff00");
-    // pickableTiles[0].material.opacity = 1;
-
     for (let i = 0; i< rows;i++) {
         for (let j = 0; j < columns; j++) {
 
@@ -2995,8 +3008,8 @@ function animate() {
 
             let color = interpolateColor("00ff00", "ff0000", normalize(1, 10, tiles[i][j].cost));
             // color = interpolateColor("2c2cce", "ff00a0", normalize(0, member.v_pref, member.vm));
-            // pickableTiles[i * world.x / tile.w + j].material.color.set(color);
-            // pickableTiles[i * world.x / tile.w + j].material.opacity = 1;
+            pickableTiles[i * world.x / tile.w + j].material.color.set(color);
+            pickableTiles[i * world.x / tile.w + j].material.opacity = 1;
 
 
         }
@@ -3161,12 +3174,11 @@ function animate() {
     });
 
 
-
     renderer.render(scene, camera);
     stats.update()
 
     // performAStar();
-};
+}
 
 
 function updateDensity(T, circle) {
@@ -3273,6 +3285,7 @@ gridization();
 // downloadWallData("escape");
 render();
 animate();
+
 let intervalId = window.setInterval(function(){
     performAStar();
 }, 5000);
@@ -3283,4 +3296,56 @@ let intervalId = window.setInterval(function(){
 //     }, 5000);
 //     // performAStar();
 // }
+
+
+
+function interaction(){
+
+
+
+    // find intersections
+
+    raycaster.setFromCamera( pointer, camera );
+
+    const intersects = raycaster.intersectObjects( scene.children, false );
+
+    if ( intersects.length > 0 ) {
+
+        if ( INTERSECTED !== intersects[ 0 ].object ) {
+
+            if ( INTERSECTED ){
+                INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+
+
+            }
+
+            INTERSECTED = intersects[ 0 ].object;
+            INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+            INTERSECTED.material.emissive.setHex( 0xff0000 );
+
+            if (intersects[ 0 ].waitAgent){
+                INTERSECTED_FOLLOWED =intersects[ 0 ].waitAgent.object;
+                INTERSECTED_FOLLOWED.currentHex = INTERSECTED_FOLLOWED.material.emissive.getHex();
+                INTERSECTED_FOLLOWED.material.emissive.setHex( 0xff0000 );
+            }else {
+
+                if(INTERSECTED_FOLLOWED) INTERSECTED_FOLLOWED.currentHex = INTERSECTED_FOLLOWED.material.emissive.getHex();
+
+            }
+
+        }
+
+    } else {
+
+        if ( INTERSECTED ){
+            INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+        }
+
+        if(INTERSECTED_FOLLOWED) INTERSECTED_FOLLOWED.currentHex = INTERSECTED_FOLLOWED.material.emissive.getHex();
+
+
+        INTERSECTED = null;
+        INTERSECTED_FOLLOWED = null;
+    }
+}
 
