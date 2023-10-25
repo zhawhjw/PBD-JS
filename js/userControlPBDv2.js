@@ -82,20 +82,22 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     const d1 = 0.3;
     const d2 = 1.0;
 
+    function getVectorMagnitude(vector){
+        return Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+    }
+
     function getUnitVector(vector){
         // Define the 2D vector
         // const vector = { x: 3, y: 4 }; // Example vector
 
         // Calculate the magnitude (length) of the vector
-        const magnitude = Math.sqrt(vector.x * vector.x + vector.y * vector.y);
+        const magnitude = getVectorMagnitude(vector);
 
         // Calculate the unit vector
-        const unitVector = {
+        return {
             x: vector.x / magnitude,
             y: vector.y / magnitude
         };
-
-        return unitVector;
     }
 
     function normalize(min, max, value) {
@@ -454,6 +456,40 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return angle < Math.PI / 3; // Adjust this angle to control the "field of view" for agents.
     }
 
+    function isAgentInFront180(agentA, agentB, direction) {
+        const difference = agentB.clone().sub(agentA);
+        const angle = difference.angleTo(direction);
+        return angle < Math.PI / 2; // Adjust this angle to control the "field of view" for agents.
+    }
+
+    function isAgentInFront30(agentA, agentB, direction) {
+        const difference = agentB.clone().sub(agentA);
+        const angle = difference.angleTo(direction);
+        return angle < Math.PI / 12; // Adjust this angle to control the "field of view" for agents.
+    }
+
+    function rotateVector(vec, D, dir) {
+        const rad = D * Math.PI / 180; // Convert angle to radians
+
+        let cosTheta = Math.cos(rad);
+        let sinTheta = Math.sin(rad);
+
+        if (dir === 'clockwise') {
+            return {
+                x: vec.x * cosTheta + vec.z * sinTheta,
+                z: -vec.x * sinTheta + vec.z * cosTheta
+            };
+        } else if (dir === 'counter-clockwise') {
+            return {
+                x: vec.x * cosTheta - vec.z * sinTheta,
+                z: vec.x * sinTheta + vec.z * cosTheta
+            };
+        } else {
+            throw new Error("Invalid rotation direction. Use 'clockwise' or 'counter-clockwise'.");
+        }
+    }
+
+
 
     function closestSeeAgent(point, points) {
         let closest = null;
@@ -511,6 +547,58 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         }
         return closest;
     }
+
+
+    function maxSpeedAgent(item, agents) {
+        let leader = null;
+        let maxSpeed = -1;
+        let cachedAgents = [];
+
+        for (let i = 0; i < agents.length; i++) {
+            const checkedAgent = agents[i];
+
+            if(item.index === checkedAgent.index){
+                continue;
+            }
+
+            if(checkedAgent.simEnd){
+                continue;
+            }
+
+            if(mode===3 && checkedAgent.group_id !== item.group_id){
+                continue;
+            }
+
+            const agentCentroidDist = distance(item.x, item.z, checkedAgent.x, checkedAgent.z);
+            const follower_position = new THREE.Vector3( item.x, 0, item.z );
+            const checkedPoint_position = new THREE.Vector3( checkedAgent.x, 0, checkedAgent.z );
+            const follower_dir = new THREE.Vector3( item.vx, 0, item.vz );
+            const direction = follower_dir.normalize();
+
+            const checkedAgentDir = new THREE.Vector3( checkedAgent.vx, 0, checkedAgent.vz );
+
+
+            let flag1 = (agentCentroidDist - 2 * RADIUS) < 4 * RADIUS; // censor distance range
+            let flag2 = isAgentInFront180(follower_position, checkedPoint_position, direction)
+
+            if(flag1 && flag2){
+                let agentSpeed = getVectorMagnitude(checkedAgentDir);
+                if (agentSpeed > maxSpeed){
+                    leader = checkedAgent;
+                    cachedAgents.push(leader);
+                    maxSpeed = agentSpeed;
+
+                }
+            }
+
+        }
+
+        item.cachedAgents = cachedAgents;
+
+        return leader;
+    }
+
+
 
     function findLeader(){
         sceneEntities.forEach(function (item){
@@ -670,6 +758,137 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
     }
 
+    function followingV4(agent_i){
+
+        // if(agent_i.noFollowingTimer > -1){
+        //     return;
+        // }
+
+        agent_i.waitAgent = maxSpeedAgent(agent_i, sceneEntities);
+
+        // you go first
+        if(agent_i.waitAgent !== null && agent_i.waitAgent.index === agent_i.index ){
+            agent_i.waitAgent = null;
+        }
+
+
+        const agentDir = new THREE.Vector3( agent_i.vx, 0, agent_i.vz );
+        const dirNorm = agentDir.normalize();
+
+        if(agent_i.waitAgent){
+
+
+            let distToGoal = distance(agent_i.x, agent_i.z, agent_i.waitAgent.x, agent_i.waitAgent.z );
+
+            if(distToGoal<0.1){
+                distToGoal = 0.1;
+            }
+            const dir_x = (agent_i.waitAgent.x - agent_i.x)/distToGoal;
+            const dir_z = (agent_i.waitAgent.z - agent_i.z)/distToGoal;
+
+            agent_i.v_pref = agent_i.waitAgent.v_pref;
+
+            agent_i.px = agent_i.x + timestep * agent_i.v_pref * dir_x;
+            agent_i.pz = agent_i.z + timestep * agent_i.v_pref * dir_z;
+
+            // distance shrink
+            const activate_dist = agent_i.minVariance + agent_i.variance;
+            const agentCentroidDist = distance(agent_i.x, agent_i.z, agent_i.waitAgent.x, agent_i.waitAgent.z );
+            let delta =  (agentCentroidDist - 2 * RADIUS);
+
+            let MAX = delta / agentCentroidDist;
+
+            // let scalar = normalize(agent_i.minVariance, activate_dist, delta);
+            let scalar = getRandomFloat(0, MAX, 1);
+
+            agent_i.px = agent_i.x + (agent_i.px - agent_i.x) * 0.5;
+            agent_i.pz = agent_i.z + (agent_i.pz - agent_i.z) *  0.5;
+
+            let emptyDirs = []
+
+            for (let i =0;i<3;i++){
+                let clockDirNorm =  rotateVector(dirNorm, 15 + i * 30, "clockwise");
+                let cClockDirNorm =  rotateVector(dirNorm, 15 + i * 30, "counter-clockwise");
+
+                let clock = false;
+                let cClock = false;
+
+                for (let k =0; k<agent_i.cachedAgents.length;k++){
+                    let cachedAgent = agent_i.cachedAgents[k];
+
+                    const agent_i_position = new THREE.Vector3( agent_i.x, 0, agent_i.z );
+                    const cachedAgent_position = new THREE.Vector3( cachedAgent.x, 0, cachedAgent.z );
+
+                    let flag2 = isAgentInFront30(agent_i_position, cachedAgent_position, new THREE.Vector3( clockDirNorm.x, 0, clockDirNorm.z ));
+                    let flag3 = isAgentInFront30(agent_i_position, cachedAgent_position, new THREE.Vector3( cClockDirNorm.x, 0, cClockDirNorm.z ))
+
+                    clock = clock || !flag2;
+                    cClock = cClock || !flag3;
+
+                }
+
+                if(clock){
+                    emptyDirs.push(clockDirNorm);
+                }
+
+                if(cClock){
+                    emptyDirs.push(cClockDirNorm);
+                }
+
+            }
+
+            const magnitude1 = Math.sqrt(agent_i.vx * agent_i.vx + agent_i.vz * agent_i.vz);
+
+            if(emptyDirs.length > 0 &&  magnitude1 < agent_i.v_pref * 0.5){
+                agent_i.waitAgent = null;
+                agent_i.emptyDirs = emptyDirs;
+
+
+                let ps =[];
+                for (let i =0;i<emptyDirs.length;i++){
+                    let dir = emptyDirs[i];
+                    const dir_x = dir.x;
+                    const dir_z = dir.z;
+                    let px = agent_i.x + timestep * agent_i.v_pref  * dir_x;
+                    let pz = agent_i.z + timestep * agent_i.v_pref * dir_z;
+                    ps.push({x:px, z:pz});
+                }
+
+                let emptyPositions = sortByDistance(ps, agent_i.scenarioGoal);
+
+
+                agent_i.px = emptyPositions[0].x;
+                agent_i.pz = emptyPositions[0].z;
+                //
+                // agent_i.noFollowingTimer = timerMax;
+            }
+
+
+
+
+        }
+
+
+
+    }
+
+
+    function sortByDistance(vecArray, refVec) {
+        return vecArray.slice().sort((a, b) => {
+            // Calculate squared distances to avoid using Math.sqrt() for performance reasons
+            const distSqA = (a.x - refVec.x) ** 2 + (a.z - refVec.z) ** 2;
+            const distSqB = (b.x - refVec.x) ** 2 + (b.z - refVec.z) ** 2;
+
+            return distSqA - distSqB;
+        });
+    }
+
+
+    function getRandomFloat(min, max, decimals) {
+        const str = (Math.random() * (max - min) + min).toFixed(decimals);
+
+        return parseFloat(str);
+    }
     function convertWorld2Grid(world_position){
 
 
@@ -886,6 +1105,33 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         });
     }
 
+    function agentVelocityPlannerV5(){
+        sceneEntities.forEach(function (item){
+
+            if(item.noFollowingTimer > -1){
+                item.noFollowingTimer -= 1;
+
+                const dir_x = item.prev_vx;
+                const dir_z = item.prev_vz;
+
+                let nDir =  normalizeVector2D({x:dir_x,z:dir_z});
+                item.vx = item.v_pref * nDir.x;
+                item.vz = item.v_pref * nDir.z;
+
+                return;
+            }
+
+            let velocity = item.scenarioVec;
+
+            const dir_x = velocity.x;
+            const dir_z = velocity.z;
+            item.vx = item.v_pref * dir_x;
+            item.vz = item.v_pref * dir_z;
+
+
+        });
+    }
+
     function haveSameSign(num1, num2) {
         // Check if both numbers are positive or both are negative
         return (num1 > 0 && num2 > 0) || (num1 < 0 && num2 < 0);
@@ -900,7 +1146,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     const timestep = 0.03;
     const ITERNUM =3;
     const KSI = 0.5;
-
+    let timerMax = 70;
 
     sceneEntities.forEach(function (item){
         item.prev_vx = item.vx;
@@ -911,7 +1157,9 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
 
     // agentVelocityPlannerV2(sceneEntities);
-    agentVelocityPlannerV4(sceneEntities);
+    // agentVelocityPlannerV4(sceneEntities);
+
+    agentVelocityPlannerV5(sceneEntities);
 
     sceneEntities.forEach(function (item) {
 
@@ -922,8 +1170,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         // if (!z_sign) item.prev_vz = 0;
 
         // need to be revised
-        item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
-        item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
+        // item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
+        // item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
 
         item.px = item.x + timestep*item.vx;
         item.pz = item.z + timestep*item.vz;
@@ -931,105 +1179,105 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
     });
 
-    const AVOID_RADIUS = 2.5;
-    function getNearbyAgents(agent, agents) {
-        return agents.filter(other => {
-            if (agent === other) return false;
-            const dx = other.px - agent.px;
-            const dy = other.pz - agent.pz;
-            return Math.sqrt(dx*dx + dy*dy) < AVOID_RADIUS;
-        });
-    }
-    function avoidCollision(agent, agents) {
-        const nearbyAgents = getNearbyAgents(agent, agents);
-        let steerX = 0;
-        let steerY = 0;
-
-        nearbyAgents.forEach(other => {
-            const dx = agent.px - other.px;
-            const dy = agent.pz - other.pz;
-            const distance = Math.sqrt(dx*dx + dy*dy);
-
-            // The closer the other agent is, the stronger the steering force
-            const force = (AVOID_RADIUS - distance) / AVOID_RADIUS;
-            steerX += dx / distance * force;
-            steerY += dy / distance * force;
-        });
-
-        // Here you can normalize the steering force if needed, and also add limits
-        // so that agents don't take too sharp turns or too fast movements
-
-        agent.px += steerX;
-        agent.pz += steerY;
-    }
-
+    // const AVOID_RADIUS = 2.5;
+    // function getNearbyAgents(agent, agents) {
+    //     return agents.filter(other => {
+    //         if (agent === other) return false;
+    //         const dx = other.px - agent.px;
+    //         const dy = other.pz - agent.pz;
+    //         return Math.sqrt(dx*dx + dy*dy) < AVOID_RADIUS;
+    //     });
+    // }
+    // function avoidCollision(agent, agents) {
+    //     const nearbyAgents = getNearbyAgents(agent, agents);
+    //     let steerX = 0;
+    //     let steerY = 0;
+    //
+    //     nearbyAgents.forEach(other => {
+    //         const dx = agent.px - other.px;
+    //         const dy = agent.pz - other.pz;
+    //         const distance = Math.sqrt(dx*dx + dy*dy);
+    //
+    //         // The closer the other agent is, the stronger the steering force
+    //         const force = (AVOID_RADIUS - distance) / AVOID_RADIUS;
+    //         steerX += dx / distance * force;
+    //         steerY += dy / distance * force;
+    //     });
+    //
+    //     // Here you can normalize the steering force if needed, and also add limits
+    //     // so that agents don't take too sharp turns or too fast movements
+    //
+    //     agent.px += steerX;
+    //     agent.pz += steerY;
+    // }
+    // function collisionAvoidance(agentA, agentB) {
+    //
+    //     let temporary_goal = opens[0];
+    //
+    //     const agentCentroidDist = distance(agentA.px, agentA.pz, agentB.px, agentB.pz );
+    //     const collisonAgentSize =  AGENTSIZE;
+    //
+    //     const agentA2exit = distance(agentA.px, agentA.pz, temporary_goal.x, temporary_goal.z );
+    //     const agentB2exit = distance(agentB.px, agentB.pz, temporary_goal.x, temporary_goal.z );
+    //
+    //
+    //     if(agentCentroidDist <= collisonAgentSize){
+    //
+    //         if(agentA2exit< agentB2exit){
+    //             agentB.px = agentB.x;
+    //             agentB.pz = agentB.z;
+    //
+    //         }else if(agentA2exit > agentB2exit){
+    //             agentA.px = agentA.x;
+    //             agentA.pz = agentA.z;
+    //
+    //         }else {
+    //             agentB.px = agentB.x;
+    //             agentB.pz = agentB.z;
+    //             agentA.px = agentA.x;
+    //             agentA.pz = agentA.z;
+    //         }
+    //
+    //     }
+    //
+    //     // const AgentDist = agentCentroidDist - collisonAgentSize;
+    //     //
+    //     // // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, expected_goal.x, expected_goal.z );
+    //     // // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, expected_goal.x, expected_goal.z );
+    //     // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, agent_i.goal_x, agent_i.goal_z );
+    //     // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, agent_j.goal_x, agent_j.goal_z );
+    //     //
+    //     //
+    //     // const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
+    //     // const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
+    //     //
+    //     //
+    //     // let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+    //     // let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
+    //     //
+    //     //
+    //     //
+    //     // if(agentCentroidDist - collisonAgentSize < 0) {
+    //     //
+    //     //     if (agent_i_goal_distance > agent_j_goal_distance) {
+    //     //         agent_i_scaler = agent_i_scaler * 2;
+    //     //
+    //     //     } else if (agent_i_goal_distance < agent_j_goal_distance) {
+    //     //         agent_j_scaler = agent_j_scaler * 2;
+    //     //
+    //     //     }
+    //     //
+    //     //     agent_i.px += agent_i_scaler * dir_x;
+    //     //     agent_i.pz += agent_i_scaler * dir_z;
+    //     //     agent_j.px += -agent_j_scaler * dir_x;
+    //     //     agent_j.pz += -agent_j_scaler * dir_z;
+    //
+    // }
 
     let pbdIters = 0;
     let agent_a, agent_b, desDistance, i, j, idx = 0;
 
-    function collisionAvoidance(agentA, agentB) {
 
-        let temporary_goal = opens[0];
-
-        const agentCentroidDist = distance(agentA.px, agentA.pz, agentB.px, agentB.pz );
-        const collisonAgentSize =  AGENTSIZE;
-
-        const agentA2exit = distance(agentA.px, agentA.pz, temporary_goal.x, temporary_goal.z );
-        const agentB2exit = distance(agentB.px, agentB.pz, temporary_goal.x, temporary_goal.z );
-
-
-        if(agentCentroidDist <= collisonAgentSize){
-
-            if(agentA2exit< agentB2exit){
-                agentB.px = agentB.x;
-                agentB.pz = agentB.z;
-
-            }else if(agentA2exit > agentB2exit){
-                agentA.px = agentA.x;
-                agentA.pz = agentA.z;
-
-            }else {
-                agentB.px = agentB.x;
-                agentB.pz = agentB.z;
-                agentA.px = agentA.x;
-                agentA.pz = agentA.z;
-            }
-
-        }
-
-        // const AgentDist = agentCentroidDist - collisonAgentSize;
-        //
-        // // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, expected_goal.x, expected_goal.z );
-        // // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, expected_goal.x, expected_goal.z );
-        // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, agent_i.goal_x, agent_i.goal_z );
-        // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, agent_j.goal_x, agent_j.goal_z );
-        //
-        //
-        // const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
-        // const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
-        //
-        //
-        // let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
-        // let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
-        //
-        //
-        //
-        // if(agentCentroidDist - collisonAgentSize < 0) {
-        //
-        //     if (agent_i_goal_distance > agent_j_goal_distance) {
-        //         agent_i_scaler = agent_i_scaler * 2;
-        //
-        //     } else if (agent_i_goal_distance < agent_j_goal_distance) {
-        //         agent_j_scaler = agent_j_scaler * 2;
-        //
-        //     }
-        //
-        //     agent_i.px += agent_i_scaler * dir_x;
-        //     agent_i.pz += agent_i_scaler * dir_z;
-        //     agent_j.px += -agent_j_scaler * dir_x;
-        //     agent_j.pz += -agent_j_scaler * dir_z;
-
-    }
 
     function coordinateCorrection(r, c){
         if(r>69){
@@ -1050,90 +1298,90 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
     }
 
-    function searchCandidateTiles(flowFieldDir, r, c){
-
-        let xDir = flowFieldDir[0];
-        let yDir = flowFieldDir[1];
-
-        let candidates = [];
-
-        let nr;
-        let nc;
-
-        if (xDir > 0 && yDir === 0){
-            // x
-            // |
-            //ooo
-            [nr, nc] = coordinateCorrection(r-1, c);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r-1, c-1);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r-1, c+1);
-            candidates.push([nr, nc]);
-
-        }else if (xDir === 0 && yDir < 0) {
-            // o
-            // o - x
-            // o
-            [nr, nc] = coordinateCorrection(r+1, c-1);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r, c-1);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r-1, c-1);
-            candidates.push([nr, nc]);
-        }else if (xDir === 0 && yDir > 0) {
-            //     o
-            // x - o
-            //     o
-            [nr, nc] = coordinateCorrection(r+1, c+1);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r, c+1);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r-1, c+1);
-            candidates.push([nr, nc]);
-        }else if (xDir > 0 && yDir > 0) {
-            // x   o
-            //   \
-            // o   o
-            [nr, nc] = coordinateCorrection(r-1, c);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r-1, c+1);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r, c+1);
-            candidates.push([nr, nc]);
-        }else if (xDir < 0 && yDir < 0) {
-            // o   x
-            //   /
-            // o   o
-            [nr, nc] = coordinateCorrection(r-1, c);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r-1, c-1);
-            candidates.push([nr, nc]);
-
-            [nr, nc] = coordinateCorrection(r-1, c);
-            candidates.push([nr, nc]);
-        }else {
-            // other conditions should not exist
-            // do nothing
-
-            nr = r;
-            nc = c;
-
-        }
-
-
-        return candidates
-
-    }
+    // function searchCandidateTiles(flowFieldDir, r, c){
+    //
+    //     let xDir = flowFieldDir[0];
+    //     let yDir = flowFieldDir[1];
+    //
+    //     let candidates = [];
+    //
+    //     let nr;
+    //     let nc;
+    //
+    //     if (xDir > 0 && yDir === 0){
+    //         // x
+    //         // |
+    //         //ooo
+    //         [nr, nc] = coordinateCorrection(r-1, c);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r-1, c-1);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r-1, c+1);
+    //         candidates.push([nr, nc]);
+    //
+    //     }else if (xDir === 0 && yDir < 0) {
+    //         // o
+    //         // o - x
+    //         // o
+    //         [nr, nc] = coordinateCorrection(r+1, c-1);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r, c-1);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r-1, c-1);
+    //         candidates.push([nr, nc]);
+    //     }else if (xDir === 0 && yDir > 0) {
+    //         //     o
+    //         // x - o
+    //         //     o
+    //         [nr, nc] = coordinateCorrection(r+1, c+1);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r, c+1);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r-1, c+1);
+    //         candidates.push([nr, nc]);
+    //     }else if (xDir > 0 && yDir > 0) {
+    //         // x   o
+    //         //   \
+    //         // o   o
+    //         [nr, nc] = coordinateCorrection(r-1, c);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r-1, c+1);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r, c+1);
+    //         candidates.push([nr, nc]);
+    //     }else if (xDir < 0 && yDir < 0) {
+    //         // o   x
+    //         //   /
+    //         // o   o
+    //         [nr, nc] = coordinateCorrection(r-1, c);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r-1, c-1);
+    //         candidates.push([nr, nc]);
+    //
+    //         [nr, nc] = coordinateCorrection(r-1, c);
+    //         candidates.push([nr, nc]);
+    //     }else {
+    //         // other conditions should not exist
+    //         // do nothing
+    //
+    //         nr = r;
+    //         nc = c;
+    //
+    //     }
+    //
+    //
+    //     return candidates
+    //
+    // }
 
     function filterCandidates(candidatesList, targetTile){
 
@@ -1154,91 +1402,23 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         });
     }
 
-    function fillGap(item){
+    function normalizeVector2D(v) {
+        const magnitude = Math.sqrt(v.x * v.x + v.z * v.z);
 
-        let actual_position = {
-            x: item.x + world.x / 2,
-            y: item.y,
-            z: item.z + world.z / 2,
+        // Prevent division by zero by returning the original vector if its magnitude is zero
+        if (magnitude === 0) return v;
 
-        }
-
-        let [r, c] = convertWorld2Grid(actual_position);
-
-
-        item.nowPosition = [r, c]
-
-        // find next candidate tiles
-
-        // let current_vec = field[r][c].vec;
-        // let candidates = searchCandidateTiles(current_vec, r, c);
-        // let filterCandidates = filterCandidates(candidates,  opens[0]);
-
-
-
-        if(r < 1){
-            item.nextPosition = null;
-            return;
-        }
-
-        let candidates = [];
-        let nr, nc;
-        //  x
-        // ooo
-        [nr, nc] = coordinateCorrection(r-1, c);
-        let desired_tile1 = field[nr][nc];
-        candidates.push(desired_tile1);
-
-        [nr, nc] = coordinateCorrection(r-1, c-1);
-        let desired_tile2 = field[nr][nc];
-        candidates.push(desired_tile2);
-
-        [nr, nc] = coordinateCorrection(r-1, c+1);
-        let desired_tile3 = field[nr][nc];
-        candidates.push(desired_tile3);
-
-
-        let filtered = filterArrayByDistance(candidates, field[r][c], opens[0])
-        if(filtered < 1){
-            item.nextPosition = null;
-            return;
-        }
-        let nextTile = filtered[0];
-
-
-
-        item.nextPosition = [nextTile.r, nextTile.c]
-
-        if(nextTile.cost  > 1){
-            return;
-        }
-
-        item.waitAgent = null;
-
-        let distToGoal = distance(item.x, item.z, nextTile.x, nextTile.z );
-
-        if (distToGoal < 0.01){
-            distToGoal = 0.01;
-        }
-
-        const dir_x = (nextTile.x- item.x)/distToGoal;
-        const dir_z = (nextTile.z- item.z)/distToGoal;
-
-        item.vx = item.v_pref * dir_x;
-        item.vz = item.v_pref * dir_z;
-
-        item.px = item.x + timestep*item.vx;
-        item.pz = item.z + timestep*item.vz;
-
-        item.nextTarget = [item.px, item.pz]
-
-
+        return {
+            x: v.x / magnitude,
+            z: v.z / magnitude
+        };
     }
 
     // found proper leader for each agent
     // findLeader();
     sceneEntities.forEach(function (item){
         // followingV3(item);
+        followingV4(item);
     });
 
 
@@ -1256,7 +1436,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         while(j<sceneEntities.length)
         {
 
-            collisionAvoidance(sceneEntities[i],sceneEntities[j]);
+            // collisionAvoidance(sceneEntities[i],sceneEntities[j]);
             // collisionConstraint(sceneEntities[i],sceneEntities[j]);
             j+=1;
         }
@@ -1288,11 +1468,6 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
     sceneEntities.forEach(function (item) {
 
-
-
-
-
-
         item.vx = (item.px-item.x)/timestep;
         item.vz = (item.pz-item.z)/timestep;
         item.vy = (item.py-item.y)/timestep;
@@ -1303,76 +1478,374 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         item.z = item.pz;
         item.y = item.py;
 
-
-        if(mode !==3){
-            if(item.x < -world.x/2)
-            {
-                item.x = -world.x/2;
-            }
-            else if(item.x > world.x/2)
-            {
-                item.x = world.x/2;
-            }
+        if(item.x < -world.x/2)
+        {
+            item.x = -world.x/2;
+        }
+        else if(item.x > world.x/2)
+        {
+            item.x = world.x/2;
+        }
 
 
-            if(item.z < -world.z/2)
-            {
-                item.z = -world.z/2;
-            }
-            else if(item.z > world.z/2)
-            {
-                item.z= world.z/2;
-            }
+        if(item.z < -world.z/2)
+        {
+            item.z = -world.z/2;
+        }
+        else if(item.z > world.z/2)
+        {
+            item.z= world.z/2;
+        }
+
+
+        // if(mode !==3){
+        //     if(item.x < -world.x/2)
+        //     {
+        //         item.x = -world.x/2;
+        //     }
+        //     else if(item.x > world.x/2)
+        //     {
+        //         item.x = world.x/2;
+        //     }
+        //
+        //
+        //     if(item.z < -world.z/2)
+        //     {
+        //         item.z = -world.z/2;
+        //     }
+        //     else if(item.z > world.z/2)
+        //     {
+        //         item.z= world.z/2;
+        //     }
+        // }else {
+        //
+        //     if(item.group_id === 1) {
+        //
+        //         if(item.fGoal_x <= -55){
+        //             if (item.x <= -55) {
+        //                 item.x = world.x / 2;
+        //                 item.z = item.sz;
+        //             }
+        //         }else {
+        //             if (item.x <= item.fGoal_x) {
+        //                 item.x = world.x / 2;
+        //                 item.z = item.sz;
+        //             }
+        //         }
+        //
+        //
+        //
+        //     }else if(item.group_id === 2){
+        //         if(item.fGoal_x >= 55){
+        //             if (item.x >= 55) {
+        //                 item.x = -world.x / 2;
+        //                 item.z = item.sz;
+        //             }
+        //         }else {
+        //             if (item.x >= item.fGoal_x) {
+        //                 item.x = -world.x / 2;
+        //                 item.z = item.sz;
+        //             }
+        //         }
+        //
+        //
+        //
+        //
+        //     }
+        //
+        //
+        // }
+
+
+
+    });
+
+    function getNextTiles(flowFieldDir, r, c){
+
+        let xDir = flowFieldDir.x;
+        let yDir = flowFieldDir.z;
+
+        let candidates = [];
+
+        let nr;
+        let nc;
+
+        if (xDir > 0 && yDir === 0){
+            // x
+            // |
+            // o
+
+            [nr, nc] = coordinateCorrection(r-1, c);
+            // candidates.push([nr, nc]);
+
+            // [nr, nc] = coordinateCorrection(r-1, c-1);
+            // candidates.push([nr, nc]);
+            //
+            // [nr, nc] = coordinateCorrection(r-1, c+1);
+            // candidates.push([nr, nc]);
+
+        }else if (xDir === 0 && yDir < 0) {
+            //
+            // o - x
+            //
+
+            // [nr, nc] = coordinateCorrection(r+1, c-1);
+            // candidates.push([nr, nc]);
+            //
+            [nr, nc] = coordinateCorrection(r, c-1);
+            // candidates.push([nr, nc]);
+            //
+            // [nr, nc] = coordinateCorrection(r-1, c-1);
+            // candidates.push([nr, nc]);
+
+        }else if (xDir === 0 && yDir > 0) {
+            //
+            // x - o
+            //
+
+            // [nr, nc] = coordinateCorrection(r+1, c+1);
+            // candidates.push([nr, nc]);
+            //
+            [nr, nc] = coordinateCorrection(r, c+1);
+            // candidates.push([nr, nc]);
+            //
+            // [nr, nc] = coordinateCorrection(r-1, c+1);
+            // candidates.push([nr, nc]);
+
+        }else if (xDir > 0 && yDir > 0) {
+            // x
+            //   \
+            //     o
+
+            // [nr, nc] = coordinateCorrection(r-1, c);
+            // candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c+1);
+            // candidates.push([nr, nc]);
+
+            // [nr, nc] = coordinateCorrection(r, c+1);
+            // candidates.push([nr, nc]);
+        }else if (xDir < 0 && yDir < 0) {
+            //     x
+            //   /
+            // o
+
+            // [nr, nc] = coordinateCorrection(r-1, c);
+            // candidates.push([nr, nc]);
+
+            [nr, nc] = coordinateCorrection(r-1, c-1);
+            // candidates.push([nr, nc]);
+
+            // [nr, nc] = coordinateCorrection(r-1, c);
+            // candidates.push([nr, nc]);
+
         }else {
+            // other conditions should not exist
+            // do nothing
 
-            if(item.group_id === 1) {
+            nr = r;
+            nc = c;
 
-                if(item.fGoal_x <= -55){
-                    if (item.x <= -55) {
-                        item.x = world.x / 2;
-                        item.z = item.sz;
-                    }
-                }else {
-                    if (item.x <= item.fGoal_x) {
-                        item.x = world.x / 2;
-                        item.z = item.sz;
-                    }
-                }
+        }
 
 
+        return [nr, nc]
 
-            }else if(item.group_id === 2){
-                if(item.fGoal_x >= 55){
-                    if (item.x >= 55) {
-                        item.x = -world.x / 2;
-                        item.z = item.sz;
-                    }
-                }else {
-                    if (item.x >= item.fGoal_x) {
-                        item.x = -world.x / 2;
-                        item.z = item.sz;
-                    }
-                }
+    }
+
+    function getRevisedDir(flowFieldDir, exit, item){
+
+        let rDir = {x:0, z:0};
+
+        let xDir = flowFieldDir[0];
+        let yDir = flowFieldDir[1];
+
+        if (xDir > 0 && yDir === 0){
+            // x
+            // |
+            //ooo
+
+
+            rDir = {x:0, z: item.z - exit.z };
+            rDir = normalizeVector2D(rDir);
+
+
+        }else if (xDir === 0 && yDir < 0) {
+            // o
+            // o - x
+            // o
+
+            rDir = {x:1, z: 0 };
+
+
+        }else if (xDir === 0 && yDir > 0) {
+            //     o
+            // x - o
+            //     o
+
+            rDir = {x:1, z: 0 };
+
+
+        }else if (xDir > 0 && yDir > 0) {
+            // x   o
+            //   \
+            // o   o
+
+            rDir = {x:-1, z: -1 };
 
 
 
+        }else if (xDir < 0 && yDir < 0) {
+            // o   x
+            //   /
+            // o   o
 
-            }
-            // }else {
-            //     if(item.x >= 60)
-            //     {
-            //         item.x = -60;
-            //         item.z = item.sz;
-            //     }
-            // }
+            rDir = {x:1, z: 1 };
+
+
+        }else {
+            // other conditions should not exist
+            // do nothing
+
 
 
 
         }
 
 
+        return rDir
 
-    });
+    }
+
+    function fillGap(item){
+
+        let actual_position = {
+            x: item.x + world.x / 2,
+            y: item.y,
+            z: item.z + world.z / 2,
+
+        }
+
+        let [r, c] = convertWorld2Grid(actual_position);
+
+
+        item.nowPosition = [r, c]
+
+        // find next candidate tiles
+        let nr, nc;
+
+        // let candidates = searchCandidateTiles(current_vec, r, c);
+        // let filterCandidates = filterCandidates(candidates,  opens[0]);
+
+        let current_vec = field[r][c].vec;
+        let nextCoordinate = getNextTiles(current_vec, r, c);
+        nr = nextCoordinate[0];
+        nc = nextCoordinate[1];
+        [nr, nc] = coordinateCorrection(nr, nc);
+        let nextTile = field[nr][nc];
+
+        if (nextTile.cost <= 1){
+            item.nextPosition = [nr, nc];
+            return;
+        }
+
+        let revisedVector = getRevisedDir(current_vec, opens[0], item);
+        let revisedCoordinate = getNextTiles(revisedVector, r, c);
+        let rr = revisedCoordinate[0];
+        let rc = revisedCoordinate[1];
+        [rr, rc] = coordinateCorrection(rr, rc);
+        let revisedTile = field[rr][rc];
+
+        if (revisedTile.cost <= 1){
+            item.nextPosition = [rr, rc];
+
+            const dir_x = revisedVector.x;
+            const dir_z = revisedVector.z;
+            item.vx = item.v_pref * dir_x;
+            item.vz = item.v_pref * dir_z;
+
+
+        }else {
+
+            const dir_x = 0;
+            const dir_z = 0;
+            item.vx = item.v_pref * dir_x;
+            item.vz = item.v_pref * dir_z;
+
+        }
+
+        // let exit = opens[0];
+        // const dir2exit = new THREE.Vector3( exit.x - item.x , 0, exit.z - item.z );
+        // const dir2exitNorm = dir2exit.normalize();
+        // const agentB2exit = distance(agentB.px, agentB.pz, exit.x, exit.z );
+
+
+
+
+        // if(r < 1){
+        //     item.nextPosition = null;
+        //     return;
+        // }
+
+        // let candidates = [];
+        // let nr, nc;
+        // //  x
+        // //  ]
+        // // ooo
+        // [nr, nc] = coordinateCorrection(r-1, c);
+        // let desired_tile1 = field[nr][nc];
+        // candidates.push(desired_tile1);
+        //
+        // [nr, nc] = coordinateCorrection(r-1, c-1);
+        // let desired_tile2 = field[nr][nc];
+        // candidates.push(desired_tile2);
+        //
+        // [nr, nc] = coordinateCorrection(r-1, c+1);
+        // let desired_tile3 = field[nr][nc];
+        // candidates.push(desired_tile3);
+
+
+
+
+
+        // let filtered = filterArrayByDistance(candidates, field[r][c], opens[0])
+        // if(filtered < 1){
+        //     item.nextPosition = null;
+        //     return;
+        // }
+        // let nextTile = filtered[0];
+        //
+        //
+        //
+        // item.nextPosition = [nextTile.r, nextTile.c]
+        //
+        // if(nextTile.cost  > 1){
+        //     return;
+        // }
+        //
+        // item.waitAgent = null;
+        //
+        // let distToGoal = distance(item.x, item.z, nextTile.x, nextTile.z );
+        //
+        // if (distToGoal < 0.01){
+        //     distToGoal = 0.01;
+        // }
+        //
+        // const dir_x = (nextTile.x- item.x)/distToGoal;
+        // const dir_z = (nextTile.z- item.z)/distToGoal;
+        //
+        // item.vx = item.v_pref * dir_x;
+        // item.vz = item.v_pref * dir_z;
+        //
+        // item.px = item.x + timestep*item.vx;
+        // item.pz = item.z + timestep*item.vz;
+        //
+        // item.nextTarget = [item.px, item.pz]
+
+
+    }
+
+
 
 
 }

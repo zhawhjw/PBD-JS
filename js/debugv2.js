@@ -971,7 +971,7 @@ function init() {
     scene.add(directionalLight);
 
     // axes
-    // scene.add(new THREE.AxesHelper(40));
+    scene.add(new THREE.AxesHelper(40));
     const loader = new THREE.TextureLoader();
     const texture = loader.load('resources/OIP.jpg');
     texture.wrapS = THREE.RepeatWrapping;
@@ -1070,8 +1070,8 @@ function init() {
                 vx: vx,
                 vy: 0.0,
                 vz: vz,
-                // v_pref: velocityMagnitude,
-                v_pref: 0.8,
+                v_pref: velocityMagnitude,
+                // v_pref: 0.8,
 
                 radius: RADIUS,
                 invmass: 0.5,
@@ -1088,7 +1088,7 @@ function init() {
                 closetSegment:[],
                 outTrack:false,
                 passingDoor:false,
-
+                cachedAgents:[],
 
                 simEnd:null,
 
@@ -1108,7 +1108,7 @@ function init() {
                 backupPath: null,
                 backup: [],
                 zForce: 0,
-
+                emptyDirs :[],
                 target: null,
 
                 fGoal_x: goalPos.x + dx * i,
@@ -1132,7 +1132,10 @@ function init() {
                 openFlag:false,
 
                 noFollowingTimer:-1,
-                freezeTimer:-1
+                freezeTimer:-1,
+
+                scenarioVec: {x:dir, z:0},
+                scenarioGoal: {x: dir * 100, z:startPos.z + dz * i}
 
             });
             i += 1;
@@ -1241,7 +1244,9 @@ function init() {
 
     }
 
-    function singleHallwayAgentConfiguration(){
+    function simpleHallwayAgentConfiguration(){
+
+        plannerMode = 3;
 
         [rows, columns] = cut();
 
@@ -1250,7 +1255,7 @@ function init() {
 
         let pieces1 = []
         for (let i = 0; i<rows;i++){
-            pieces1.push([i, 16]);
+            pieces1.push([i, 25]);
         }
 
         // console.log(pieces1);
@@ -1258,27 +1263,15 @@ function init() {
 
         let pieces2 = []
         for (let i = 0; i<rows;i++){
-            pieces2.push([i, 30]);
+            pieces2.push([i, 35]);
         }
 
         let pieces3 = []
-        pieces3.push([20, 15])
-        pieces3.push([20, 16])
-        pieces3.push([20, 17])
-        pieces3.push([20, 18])
-        pieces3.push([20, 19])
-        pieces3.push([20, 20])
-        // pieces3.push([20, 21])
-        // pieces3.push([20, 22])
-        pieces3.push([20, 23])
-        pieces3.push([20, 24])
-        pieces3.push([20, 25])
-        pieces3.push([20, 26])
-        pieces3.push([20, 27])
-        pieces3.push([20, 28])
-        pieces3.push([20, 29])
-
-
+        // for (let i = 30; i<39;i++){
+        //     pieces3.push([i, 31]);
+        //     pieces3.push([i, 30]);
+        //
+        // }
 
         fobs = [...pieces1, ...pieces2, ...pieces3];
         // fobs.push([...pieces2]);
@@ -1286,86 +1279,163 @@ function init() {
 
         obstacles = fobs;
 
+        for (let i = 16;i<23;i++){
 
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: 1
-            }, {
-                x: -35,
-                z: 1
-            },
-            0.8, "X", );
+            addColumnAgentGroup(agentData, 16, RADIUS * 3, {
+                    x: 25,
+                    z: -48.5 + i * 2
+                }, {
+                    x: -65,
+                    z: -16.5
+                },
+                0.8, "X", 3, -1, 1);
 
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: 6
-            }, {
-                x: -35,
-                z: 6
-            },
-            0.8, "X", );
+        }
 
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: -7
-            }, {
-                x: -35,
-                z: -7
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: 30,
-                z: -12
-            }, {
-                x: -35,
-                z: -12
-            },
-            0.8, "X", );
+        // for(let i = 18; i< 25;i++){
+        //     addColumnAgentGroup(agentData, 16, RADIUS * 3, {
+        //             x: -70,
+        //             z: -49 + i * 2
+        //         }, {
+        //             x: 65,
+        //             z: -3
+        //         },
+        //         0.8, "X", 3, 1, 2);
+        // }
 
 
 
-
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: -30,
-                z: 0
-            }, {
-                x: 35,
-                z: 0
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: -30,
-                z: 5
-            }, {
-                x: 35,
-                z: 5
-            },
-            0.8, "X", );
-
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: -30,
-                z: -5
-            }, {
-                x: 35,
-                z: -5
-            },
-            0.8, "X", );
-
-        addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-                x: -30,
-                z: -10
-            }, {
-                x: 35,
-                z: -10
-            },
-            0.8, "X", );
-
+        agentData.forEach(function (a){
+            a.v_pref = getRandomFloat(0.4, 1.2, 1);
+        })
 
     }
+
+    // function singleHallwayAgentConfiguration(){
+    //
+    //     [rows, columns] = cut();
+    //
+    //     let fobs = []
+    //
+    //
+    //     let pieces1 = []
+    //     for (let i = 0; i<rows;i++){
+    //         pieces1.push([i, 16]);
+    //     }
+    //
+    //     // console.log(pieces1);
+    //
+    //
+    //     let pieces2 = []
+    //     for (let i = 0; i<rows;i++){
+    //         pieces2.push([i, 30]);
+    //     }
+    //
+    //     let pieces3 = []
+    //     pieces3.push([20, 15])
+    //     pieces3.push([20, 16])
+    //     pieces3.push([20, 17])
+    //     pieces3.push([20, 18])
+    //     pieces3.push([20, 19])
+    //     pieces3.push([20, 20])
+    //     // pieces3.push([20, 21])
+    //     // pieces3.push([20, 22])
+    //     pieces3.push([20, 23])
+    //     pieces3.push([20, 24])
+    //     pieces3.push([20, 25])
+    //     pieces3.push([20, 26])
+    //     pieces3.push([20, 27])
+    //     pieces3.push([20, 28])
+    //     pieces3.push([20, 29])
+    //
+    //
+    //
+    //     fobs = [...pieces1, ...pieces2, ...pieces3];
+    //     // fobs.push([...pieces2]);
+    //     // console.log(fobs);
+    //
+    //     obstacles = fobs;
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: 1
+    //         }, {
+    //             x: -35,
+    //             z: 1
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: 6
+    //         }, {
+    //             x: -35,
+    //             z: 6
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: -7
+    //         }, {
+    //             x: -35,
+    //             z: -7
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: 30,
+    //             z: -12
+    //         }, {
+    //             x: -35,
+    //             z: -12
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    //
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: -30,
+    //             z: 0
+    //         }, {
+    //             x: 35,
+    //             z: 0
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: -30,
+    //             z: 5
+    //         }, {
+    //             x: 35,
+    //             z: 5
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: -30,
+    //             z: -5
+    //         }, {
+    //             x: 35,
+    //             z: -5
+    //         },
+    //         0.8, "X", );
+    //
+    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
+    //             x: -30,
+    //             z: -10
+    //         }, {
+    //             x: 35,
+    //             z: -10
+    //         },
+    //         0.8, "X", );
+    //
+    //
+    // }
 
     function defaultAgentConfiguration(){
 
@@ -2159,9 +2229,9 @@ function init() {
     // defaultAgentConfiguration();
     // lineupConfiguration();
     // oneDirHallwayAgentConfiguration();
-    escapeScenario();
+    // escapeScenario();
     // obstacleOnlyEscapeScenario();
-
+    simpleHallwayAgentConfiguration();
 
 
 
@@ -2773,7 +2843,7 @@ function animate() {
 
     if (!isPlay) return;
     requestAnimationFrame(animate);
-    interaction();
+    // interaction();
 
 
     agentData.forEach(function(member, index){
@@ -2837,11 +2907,6 @@ function animate() {
     //     // do nothing
     // }
 
-
-
-    PHY.step(RADIUS, agentData, pickableWall, world, WORLDUNIT, plannerMode, tiles, exits );
-    // const frameNumber = parseInt(document.getElementById('frame').value);
-
     agentData.forEach(function(member, index){
 
         if (isNaN(member.x) || isNaN(member.z)){
@@ -2877,63 +2942,83 @@ function animate() {
 
         // if not initialization, need to deal with previous frame
         if(member.row !== -1 && member.column !== -1){
-            let decrement =  -2;
+            let decrement =  -1;
 
             // if agent moves to different position from last frame
             // first reduce the cost of previous occupied tile (min is 1)
-            tiles[member.row][member.column].cost += decrement;
-            if (tiles[member.row][member.column].cost < 1){
-                tiles[member.row][member.column].cost = 1;
+            for (let i = -1; i < 2 ; i++){
+
+                if (member.row + i < 0 || member.row + i > tiles.length - 1){
+                    continue;
+                }
+
+                for (let j = -1; j < 2 ; j++){
+
+                    if (member.column + j < 0 || member.column + j > tiles[0].length - 1){
+                        continue;
+                    }
+
+                    tiles[member.row + i][member.column + j].cost += decrement;
+                    if (tiles[member.row + i][member.column + j].cost < 1 ){
+                        tiles[member.row + i][member.column + j].cost = 1;
+                    }
+                }
             }
 
-            if(member.group_id === 1){
-                let targetR, targetC;
 
-                [targetR, targetC] = [member.row, member.column];
-                tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            // tiles[member.row][member.column].cost += decrement;
+            // if (tiles[member.row][member.column].cost < 1){
+            //     tiles[member.row][member.column].cost = 1;
+            // }
 
-                [targetR, targetC] = [member.row-1, member.column];
-                tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row, member.column-1];
-                tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row-1, member.column-1];
-                tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row+1, member.column];
-                tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row, member.column+1];
-                tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row+1, member.column+1];
-                tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
-
-            }else {
-                let targetR, targetC;
-
-                [targetR, targetC] = [member.row, member.column];
-                tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row-1, member.column];
-                tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row, member.column-1];
-                tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row-1, member.column-1];
-                tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row+1, member.column];
-                tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row, member.column+1];
-                tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
-
-                [targetR, targetC] = [member.row+1, member.column+1];
-                tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
-            }
+            // if(member.group_id === 1){
+            //     let targetR, targetC;
+            //
+            //     [targetR, targetC] = [member.row, member.column];
+            //     tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row-1, member.column];
+            //     tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row, member.column-1];
+            //     tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row-1, member.column-1];
+            //     tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row+1, member.column];
+            //     tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row, member.column+1];
+            //     tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row+1, member.column+1];
+            //     tiles2 = updateCostInMap(tiles2, targetR, targetC, decrement);
+            //
+            // }else {
+            //     let targetR, targetC;
+            //
+            //     [targetR, targetC] = [member.row, member.column];
+            //     tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row-1, member.column];
+            //     tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row, member.column-1];
+            //     tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row-1, member.column-1];
+            //     tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row+1, member.column];
+            //     tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row, member.column+1];
+            //     tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
+            //
+            //     [targetR, targetC] = [member.row+1, member.column+1];
+            //     tiles1 = updateCostInMap(tiles1, targetR, targetC, decrement);
+            // }
         }
 
         // update coordinate
@@ -2943,77 +3028,101 @@ function animate() {
 
 
         // increase the cost of current occupied tile (max is 9, 10 is for obstacle)
-        let increment =  2;
+        let increment =  1;
 
-        tiles[member.row][member.column].cost += increment;
-        if (tiles[member.row][member.column].cost >= obstacleCost){
-            tiles[member.row][member.column].cost = obstacleCost - 1;
+
+        for (let i = -1; i < 2 ; i++){
+
+            if (member.row + i < 0 || member.row + i > tiles.length - 1){
+                continue;
+            }
+
+            for (let j = -1; j < 2 ; j++){
+
+                if (member.column + j < 0 || member.column + j > tiles[0].length - 1){
+                    continue;
+                }
+
+                tiles[member.row + i][member.column + j].cost += increment;
+                if (tiles[member.row + i][member.column + j].cost >= obstacleCost){
+                    tiles[member.row + i][member.column + j].cost = obstacleCost - 1;
+                }
+            }
         }
+        // tiles[member.row][member.column].cost += increment;
+        // if (tiles[member.row][member.column].cost >= obstacleCost){
+        //     tiles[member.row][member.column].cost = obstacleCost - 1;
+        // }
 
-        if(member.group_id === 1){
-
-            let targetR, targetC;
-
-            [targetR, targetC] = [member.row, member.column];
-            tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row-1, member.column];
-            tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row, member.column-1];
-            tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row-1, member.column-1];
-            tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row+1, member.column];
-            tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row, member.column+1];
-            tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row+1, member.column+1];
-            tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
-
-        }else {
-            let targetR, targetC;
-
-            [targetR, targetC] = [member.row, member.column];
-            tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row-1, member.column];
-            tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row, member.column-1];
-            tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row-1, member.column-1];
-            tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row+1, member.column];
-            tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row, member.column+1];
-            tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
-
-            [targetR, targetC] = [member.row+1, member.column+1];
-            tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
-        }
+        // if(member.group_id === 1){
+        //
+        //     let targetR, targetC;
+        //
+        //     [targetR, targetC] = [member.row, member.column];
+        //     tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row-1, member.column];
+        //     tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row, member.column-1];
+        //     tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row-1, member.column-1];
+        //     tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row+1, member.column];
+        //     tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row, member.column+1];
+        //     tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row+1, member.column+1];
+        //     tiles2 = updateCostInMap(tiles2, targetR, targetC, increment);
+        //
+        // }else {
+        //     let targetR, targetC;
+        //
+        //     [targetR, targetC] = [member.row, member.column];
+        //     tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row-1, member.column];
+        //     tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row, member.column-1];
+        //     tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row-1, member.column-1];
+        //     tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row+1, member.column];
+        //     tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row, member.column+1];
+        //     tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
+        //
+        //     [targetR, targetC] = [member.row+1, member.column+1];
+        //     tiles1 = updateCostInMap(tiles1, targetR, targetC, increment);
+        // }
     });
 
-    for (let i = 0; i< rows;i++) {
-        for (let j = 0; j < columns; j++) {
+    PHY.step(RADIUS, agentData, pickableWall, world, WORLDUNIT, plannerMode, tiles, exits );
+    // const frameNumber = parseInt(document.getElementById('frame').value);
 
 
 
-            let color = interpolateColor("00ff00", "ff0000", normalize(1, 10, tiles[i][j].cost));
-            // color = interpolateColor("2c2cce", "ff00a0", normalize(0, member.v_pref, member.vm));
-            pickableTiles[i * world.x / tile.w + j].material.color.set(color);
-            pickableTiles[i * world.x / tile.w + j].material.opacity = 1;
-
-
-        }
-    }
+    // for (let i = 0; i< rows;i++) {
+    //     for (let j = 0; j < columns; j++) {
+    //
+    //
+    //
+    //         let color = interpolateColor("00ff00", "ff0000", normalize(1, 10, tiles[i][j].cost));
+    //         // color = interpolateColor("2c2cce", "ff00a0", normalize(0, member.v_pref, member.vm));
+    //         pickableTiles[i * world.x / tile.w + j].material.color.set(color);
+    //         pickableTiles[i * world.x / tile.w + j].material.opacity = 1;
+    //
+    //
+    //     }
+    // }
 
 
 
