@@ -322,13 +322,13 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
         if(agentCentroidDist - collisonAgentSize < 0) {
 
-            if (agent_i_goal_distance > agent_j_goal_distance) {
-                agent_i_scaler = agent_i_scaler * 2;
-
-            } else if (agent_i_goal_distance < agent_j_goal_distance) {
-                agent_j_scaler = agent_j_scaler * 2;
-
-            }
+            // if (agent_i_goal_distance > agent_j_goal_distance) {
+            //     agent_i_scaler = agent_i_scaler * 2;
+            //
+            // } else if (agent_i_goal_distance < agent_j_goal_distance) {
+            //     agent_j_scaler = agent_j_scaler * 2;
+            //
+            // }
 
             agent_i.px += agent_i_scaler * dir_x;
             agent_i.pz += agent_i_scaler * dir_z;
@@ -462,6 +462,12 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return angle < Math.PI / 2; // Adjust this angle to control the "field of view" for agents.
     }
 
+    function isAgentInFront90(agentA, agentB, direction) {
+        const difference = agentB.clone().sub(agentA);
+        const angle = difference.angleTo(direction);
+        return angle < Math.PI / 4; // Adjust this angle to control the "field of view" for agents.
+    }
+
     function isAgentInFront30(agentA, agentB, direction) {
         const difference = agentB.clone().sub(agentA);
         const angle = difference.angleTo(direction);
@@ -548,8 +554,37 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return closest;
     }
 
+    function smoothKernel(radius, dist){
+        let distNorm = normalize(0, 2 * RADIUS, radius - dist);
+
+        let v = Math.max(0, distNorm);
+        return v * v * v;
+    }
+
+    function calculateDensity(position, agents){
+        let density = 0;
+
+        for (let i =0; i<agents.length;i++){
+            let agent = agents[i];
+            let dist = distance(position.x, position.z, agent.x, agent.z);
+
+            // if (dist > 4 * RADIUS){
+            //     continue
+            // }
+
+            let influence = smoothKernel(4 * RADIUS, dist);
+            density += influence;
+
+        }
+
+        density /= agents.length;
+
+        return density;
+
+    }
 
     function maxSpeedAgent(item, agents) {
+        // MAX(w_v |Vj| + w_d */(0.001+ | p_ij |)
         let leader = null;
         let maxSpeed = -1;
         let cachedAgents = [];
@@ -598,7 +633,71 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return leader;
     }
 
+    function pickAgent(item, agents) {
+        // MAX(w_v |Vj| + w_d */(0.001+ | p_ij |)
+        let leader = null;
 
+        let speedWeight = 0.2;
+        let distWeight = 0.8;
+
+        let maxReward = -1;
+
+        let cachedAgents = [];
+        let cachedSurroundAgents = [];
+
+        for (let i = 0; i < agents.length; i++) {
+            const checkedAgent = agents[i];
+
+            if(item.index === checkedAgent.index){
+                continue;
+            }
+
+            if(checkedAgent.simEnd){
+                continue;
+            }
+
+            if(mode===3 && checkedAgent.group_id !== item.group_id){
+                continue;
+            }
+
+            const agentCentroidDist = distance(item.x, item.z, checkedAgent.x, checkedAgent.z);
+
+            // out of vision range
+            if (agentCentroidDist > 4 * RADIUS){
+                continue
+            }
+
+
+            cachedSurroundAgents.push(checkedAgent);
+
+            const follower_position = new THREE.Vector3( item.x, 0, item.z );
+            const checkedPoint_position = new THREE.Vector3( checkedAgent.x, 0, checkedAgent.z );
+            const follower_dir = new THREE.Vector3( item.vx, 0, item.vz );
+            const direction = follower_dir.normalize();
+
+            let flag2 = isAgentInFront90(follower_position, checkedPoint_position, direction)
+
+            // not in front of 90 degree of vision
+            if (!flag2){
+                continue
+            }
+
+            let leaderVelocity = checkedAgent.vm;
+
+            let reward = speedWeight * leaderVelocity + distWeight * (1 / (agentCentroidDist + 0.001))
+
+            if(reward > maxReward){
+                leader = checkedAgent;
+                maxReward = reward;
+                cachedAgents.push(checkedAgent);
+            }
+
+        }
+
+        item.cachedAgents = cachedAgents;
+        item.cachedSurroundAgents = cachedSurroundAgents;
+        return leader;
+    }
 
     function findLeader(){
         sceneEntities.forEach(function (item){
@@ -873,6 +972,118 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     }
 
 
+    function getEmptySpaceVectors(baseVector, baseAngle){
+        let candidates = [];
+        // let baseAngle = 15;
+        let num = 180 / baseAngle;
+
+        for (let i = 0;i<num;i++){
+            let angle = baseAngle + baseAngle * i;
+            let vec = rotateVector(baseVector, angle, "clockwise");
+            candidates.push(vec)
+        }
+
+        return candidates;
+    }
+
+    function followingV5(agent_i, iter=1, k = 0.9){
+
+        const estStep = 0.1;
+        let stepVectors = [
+            {x: 0, z:1},
+            {x:-1, z:1},
+            {x:-1, z:-1},
+            {x:0, z:-1}
+        ];
+
+        // stepVectors = getEmptySpaceVectors({x: 0, z:1}, 15);
+
+
+        let stepDensities = [
+
+        ];
+
+        agent_i.waitAgent = pickAgent(agent_i, sceneEntities);
+
+        // you go first
+        if(agent_i.waitAgent !== null && agent_i.waitAgent.index === agent_i.index ){
+            agent_i.waitAgent = null;
+        }
+
+        let currentDensity = calculateDensity({x:agent_i.x, z:agent_i.z}, agent_i.cachedSurroundAgents)
+
+        for (let i = 0; i<stepVectors.length;i++){
+            let stepVector = stepVectors[i];
+            let sampledX = agent_i.x + stepVector.x * estStep;
+            let sampledZ = agent_i.z + stepVector.z * estStep;
+
+            let stepDensity = calculateDensity({x:sampledX, z:sampledZ}, agent_i.cachedSurroundAgents)
+
+            stepDensities.push(stepDensity - currentDensity);
+
+        }
+
+
+        let kPrime = 1.0 - Math.pow((1.0 - k), (1.0 / iter));
+
+        if(
+            agent_i.waitAgent &&
+            // agent_i.vm > 0.5 * agent_i.v_pref
+            agent_i.waitAgent.vm - agent_i.v_pref < 0.1 &&
+            Math.min(...stepDensities) >= 0
+
+        ){
+            const correctedDir = new THREE.Vector3( agent_i.waitAgent.x - agent_i.x, 0, agent_i.waitAgent.z - agent_i.z );
+            const correctedDirNorm = correctedDir.normalize();
+
+            let dist = distance(agent_i.x, agent_i.z, agent_i.waitAgent.x, agent_i.waitAgent.z);
+
+            let scalar = smoothKernel(4 * RADIUS, dist);
+            let correctedVm = agent_i.vm - scalar * agent_i.vm;
+
+            agent_i.px = agent_i.x + kPrime * correctedDirNorm.x * correctedVm * timestep;
+            agent_i.pz = agent_i.z + kPrime * correctedDirNorm.z * correctedVm * timestep;
+
+        }else {
+            agent_i.waitAgent = null;
+            let velocity;
+
+            if(Math.min(...stepDensities) <0){
+                let targetDensity = Math.min(...stepDensities);
+                let index = stepDensities.indexOf(targetDensity);
+                velocity = stepVectors[index];
+                // velocity = agent_i.scenarioVec;
+
+                // let k = 0.1;
+                // velocity = weightedInterpolation(velocity, normalizeVector2D({x:agent_i.vx, z: agent_i.vz}), k, 1-k);
+            }else{
+                velocity = agent_i.scenarioVec;
+
+            }
+
+            let smoothVelocity = velocity;
+
+
+
+
+            agent_i.px =  agent_i.x + kPrime * smoothVelocity.x * agent_i.v_pref * timestep;
+            agent_i.pz =  agent_i.z + kPrime * smoothVelocity.z * agent_i.v_pref * timestep;
+        }
+
+
+
+
+    }
+
+    function weightedInterpolation(vec1, vec2, w1, w2) {
+        // Calculate the interpolated values
+        let x = (vec1.x * w1 + vec2.x * w2) / (w1 + w2);
+        let z = (vec1.z * w1 + vec2.z * w2) / (w1 + w2);
+
+        // Return the result as a new vector
+        return { x: x, z: z };
+    }
+
     function sortByDistance(vecArray, refVec) {
         return vecArray.slice().sort((a, b) => {
             // Calculate squared distances to avoid using Math.sqrt() for performance reasons
@@ -1108,25 +1319,12 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     function agentVelocityPlannerV5(){
         sceneEntities.forEach(function (item){
 
-            if(item.noFollowingTimer > -1){
-                item.noFollowingTimer -= 1;
-
-                const dir_x = item.prev_vx;
-                const dir_z = item.prev_vz;
-
-                let nDir =  normalizeVector2D({x:dir_x,z:dir_z});
-                item.vx = item.v_pref * nDir.x;
-                item.vz = item.v_pref * nDir.z;
-
-                return;
-            }
-
             let velocity = item.scenarioVec;
 
             const dir_x = velocity.x;
             const dir_z = velocity.z;
-            item.vx = item.v_pref * dir_x;
-            item.vz = item.v_pref * dir_z;
+            item.vx = item.vm * dir_x;
+            item.vz = item.vm * dir_z;
 
 
         });
@@ -1136,148 +1334,6 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         // Check if both numbers are positive or both are negative
         return (num1 > 0 && num2 > 0) || (num1 < 0 && num2 < 0);
     }
-
-    /*  -----------------------  */
-
-
-    const WALLSIZE = WORLDUNIT;
-    const AGENTSIZE = RADIUS * 2;
-    const epsilon = 0.0001;
-    const timestep = 0.03;
-    const ITERNUM =3;
-    const KSI = 0.5;
-    let timerMax = 70;
-
-    sceneEntities.forEach(function (item){
-        item.prev_vx = item.vx;
-        item.prev_vy = item.vy;
-        item.prev_vz = item.vz;
-
-    });
-
-
-    // agentVelocityPlannerV2(sceneEntities);
-    // agentVelocityPlannerV4(sceneEntities);
-
-    agentVelocityPlannerV5(sceneEntities);
-
-    sceneEntities.forEach(function (item) {
-
-        // let x_sign = haveSameSign(item.prev_vx, item.vx);
-        // let z_sign = haveSameSign(item.prev_vx, item.vx);
-        //
-        // if (!x_sign) item.prev_vx = 0;
-        // if (!z_sign) item.prev_vz = 0;
-
-        // need to be revised
-        // item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
-        // item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
-
-        item.px = item.x + timestep*item.vx;
-        item.pz = item.z + timestep*item.vz;
-        item.py = item.y + timestep*item.vy;
-
-    });
-
-    // const AVOID_RADIUS = 2.5;
-    // function getNearbyAgents(agent, agents) {
-    //     return agents.filter(other => {
-    //         if (agent === other) return false;
-    //         const dx = other.px - agent.px;
-    //         const dy = other.pz - agent.pz;
-    //         return Math.sqrt(dx*dx + dy*dy) < AVOID_RADIUS;
-    //     });
-    // }
-    // function avoidCollision(agent, agents) {
-    //     const nearbyAgents = getNearbyAgents(agent, agents);
-    //     let steerX = 0;
-    //     let steerY = 0;
-    //
-    //     nearbyAgents.forEach(other => {
-    //         const dx = agent.px - other.px;
-    //         const dy = agent.pz - other.pz;
-    //         const distance = Math.sqrt(dx*dx + dy*dy);
-    //
-    //         // The closer the other agent is, the stronger the steering force
-    //         const force = (AVOID_RADIUS - distance) / AVOID_RADIUS;
-    //         steerX += dx / distance * force;
-    //         steerY += dy / distance * force;
-    //     });
-    //
-    //     // Here you can normalize the steering force if needed, and also add limits
-    //     // so that agents don't take too sharp turns or too fast movements
-    //
-    //     agent.px += steerX;
-    //     agent.pz += steerY;
-    // }
-    // function collisionAvoidance(agentA, agentB) {
-    //
-    //     let temporary_goal = opens[0];
-    //
-    //     const agentCentroidDist = distance(agentA.px, agentA.pz, agentB.px, agentB.pz );
-    //     const collisonAgentSize =  AGENTSIZE;
-    //
-    //     const agentA2exit = distance(agentA.px, agentA.pz, temporary_goal.x, temporary_goal.z );
-    //     const agentB2exit = distance(agentB.px, agentB.pz, temporary_goal.x, temporary_goal.z );
-    //
-    //
-    //     if(agentCentroidDist <= collisonAgentSize){
-    //
-    //         if(agentA2exit< agentB2exit){
-    //             agentB.px = agentB.x;
-    //             agentB.pz = agentB.z;
-    //
-    //         }else if(agentA2exit > agentB2exit){
-    //             agentA.px = agentA.x;
-    //             agentA.pz = agentA.z;
-    //
-    //         }else {
-    //             agentB.px = agentB.x;
-    //             agentB.pz = agentB.z;
-    //             agentA.px = agentA.x;
-    //             agentA.pz = agentA.z;
-    //         }
-    //
-    //     }
-    //
-    //     // const AgentDist = agentCentroidDist - collisonAgentSize;
-    //     //
-    //     // // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, expected_goal.x, expected_goal.z );
-    //     // // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, expected_goal.x, expected_goal.z );
-    //     // const agent_i_goal_distance = distance(agent_i.px, agent_i.pz, agent_i.goal_x, agent_i.goal_z );
-    //     // const agent_j_goal_distance = distance(agent_j.px, agent_j.pz, agent_j.goal_x, agent_j.goal_z );
-    //     //
-    //     //
-    //     // const dir_x = (agent_j.px- agent_i.px)/agentCentroidDist;
-    //     // const dir_z = (agent_j.pz- agent_i.pz)/agentCentroidDist;
-    //     //
-    //     //
-    //     // let agent_i_scaler = agent_i.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
-    //     // let agent_j_scaler = agent_j.invmass/(agent_i.invmass+agent_j.invmass) * AgentDist;
-    //     //
-    //     //
-    //     //
-    //     // if(agentCentroidDist - collisonAgentSize < 0) {
-    //     //
-    //     //     if (agent_i_goal_distance > agent_j_goal_distance) {
-    //     //         agent_i_scaler = agent_i_scaler * 2;
-    //     //
-    //     //     } else if (agent_i_goal_distance < agent_j_goal_distance) {
-    //     //         agent_j_scaler = agent_j_scaler * 2;
-    //     //
-    //     //     }
-    //     //
-    //     //     agent_i.px += agent_i_scaler * dir_x;
-    //     //     agent_i.pz += agent_i_scaler * dir_z;
-    //     //     agent_j.px += -agent_j_scaler * dir_x;
-    //     //     agent_j.pz += -agent_j_scaler * dir_z;
-    //
-    // }
-
-    let pbdIters = 0;
-    let agent_a, agent_b, desDistance, i, j, idx = 0;
-
-
 
     function coordinateCorrection(r, c){
         if(r>69){
@@ -1414,18 +1470,72 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         };
     }
 
+    /*  -----------------------  */
+
+
+    const WALLSIZE = WORLDUNIT;
+    const AGENTSIZE = RADIUS * 2;
+    const epsilon = 0.0001;
+    const timestep = 0.03;
+    const ITERNUM =3;
+    const KSI = 0.01;
+    let timerMax = 70;
+
+    sceneEntities.forEach(function (item){
+        item.prev_vx = item.vx;
+        item.prev_vy = item.vy;
+        item.prev_vz = item.vz;
+
+    });
+
+
+    // agentVelocityPlannerV2(sceneEntities);
+    // agentVelocityPlannerV4(sceneEntities);
+
+    agentVelocityPlannerV5(sceneEntities);
+
+    sceneEntities.forEach(function (item) {
+
+        // let x_sign = haveSameSign(item.prev_vx, item.vx);
+        // let z_sign = haveSameSign(item.prev_vx, item.vx);
+        //
+        // if (!x_sign) item.prev_vx = 0;
+        // if (!z_sign) item.prev_vz = 0;
+
+        // need to be revised
+        item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
+        item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
+
+        item.px = item.x + timestep*item.vx;
+        item.pz = item.z + timestep*item.vz;
+        item.py = item.y + timestep*item.vy;
+
+    });
+
+    let pbdIters = 0;
+    let agent_a, agent_b, desDistance, i, j, idx = 0;
+
+
     // found proper leader for each agent
     // findLeader();
-    sceneEntities.forEach(function (item){
-        // followingV3(item);
-        followingV4(item);
-    });
 
+    let stiffnessFactor = 0.1;
+    // sceneEntities.forEach(function (item){
+    //
+    //      followingV5(item, 1, stiffnessFactor);
+    // });
 
-    sceneEntities.forEach(function (item){
-        // fillGap(item);
-        // avoidCollision(item, sceneEntities);
-    });
+    while(pbdIters<ITERNUM)
+    {
+        i=0;
+        while(i<sceneEntities.length)
+        {
+            followingV5(sceneEntities[i], ITERNUM, stiffnessFactor);
+            i+=1
+        }
+        pbdIters+=1;
+    }
+
 
 
     i=0;
@@ -1436,15 +1546,16 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         while(j<sceneEntities.length)
         {
 
+
             // collisionAvoidance(sceneEntities[i],sceneEntities[j]);
-            // collisionConstraint(sceneEntities[i],sceneEntities[j]);
+            collisionConstraint(sceneEntities[i],sceneEntities[j]);
             j+=1;
         }
         i+=1
     }
 
 
-
+    pbdIters = 0;
     while(pbdIters<ITERNUM)
     {
 

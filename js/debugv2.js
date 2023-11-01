@@ -1088,7 +1088,6 @@ function init() {
                 closetSegment:[],
                 outTrack:false,
                 passingDoor:false,
-                cachedAgents:[],
 
                 simEnd:null,
 
@@ -1099,7 +1098,7 @@ function init() {
 
                 modifier:1,
 
-                vm: Math.sqrt(vx * vx + vz * vz),
+                vm: velocityMagnitude,
 
                 minVariance: getRandomFloat(0.5, 1.5, 1),
                 variance: getRandomFloat(1.5, 2.5, 1),
@@ -1135,7 +1134,9 @@ function init() {
                 freezeTimer:-1,
 
                 scenarioVec: {x:dir, z:0},
-                scenarioGoal: {x: dir * 100, z:startPos.z + dz * i}
+                scenarioGoal: {x: dir * 100, z:startPos.z + dz * i},
+                cachedSurroundAgents:[],
+                cachedAgents:[],
 
             });
             i += 1;
@@ -1307,135 +1308,68 @@ function init() {
 
         agentData.forEach(function (a){
             a.v_pref = getRandomFloat(0.4, 1.2, 1);
+            a.vm = a.v_pref;
         })
 
     }
 
-    // function singleHallwayAgentConfiguration(){
-    //
-    //     [rows, columns] = cut();
-    //
-    //     let fobs = []
-    //
-    //
-    //     let pieces1 = []
-    //     for (let i = 0; i<rows;i++){
-    //         pieces1.push([i, 16]);
-    //     }
-    //
-    //     // console.log(pieces1);
-    //
-    //
-    //     let pieces2 = []
-    //     for (let i = 0; i<rows;i++){
-    //         pieces2.push([i, 30]);
-    //     }
-    //
-    //     let pieces3 = []
-    //     pieces3.push([20, 15])
-    //     pieces3.push([20, 16])
-    //     pieces3.push([20, 17])
-    //     pieces3.push([20, 18])
-    //     pieces3.push([20, 19])
-    //     pieces3.push([20, 20])
-    //     // pieces3.push([20, 21])
-    //     // pieces3.push([20, 22])
-    //     pieces3.push([20, 23])
-    //     pieces3.push([20, 24])
-    //     pieces3.push([20, 25])
-    //     pieces3.push([20, 26])
-    //     pieces3.push([20, 27])
-    //     pieces3.push([20, 28])
-    //     pieces3.push([20, 29])
-    //
-    //
-    //
-    //     fobs = [...pieces1, ...pieces2, ...pieces3];
-    //     // fobs.push([...pieces2]);
-    //     // console.log(fobs);
-    //
-    //     obstacles = fobs;
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: 1
-    //         }, {
-    //             x: -35,
-    //             z: 1
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: 6
-    //         }, {
-    //             x: -35,
-    //             z: 6
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: -7
-    //         }, {
-    //             x: -35,
-    //             z: -7
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: 30,
-    //             z: -12
-    //         }, {
-    //             x: -35,
-    //             z: -12
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    //
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: -30,
-    //             z: 0
-    //         }, {
-    //             x: 35,
-    //             z: 0
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: -30,
-    //             z: 5
-    //         }, {
-    //             x: 35,
-    //             z: 5
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: -30,
-    //             z: -5
-    //         }, {
-    //             x: 35,
-    //             z: -5
-    //         },
-    //         0.8, "X", );
-    //
-    //     addColumnAgentGroup(agentData, 4, RADIUS * 4, {
-    //             x: -30,
-    //             z: -10
-    //         }, {
-    //             x: 35,
-    //             z: -10
-    //         },
-    //         0.8, "X", );
-    //
-    //
-    // }
+    function simpleHallwayHalfAgentConfiguration(){
+
+        plannerMode = 3;
+
+        [rows, columns] = cut();
+
+        let fobs = []
+
+
+        let pieces1 = []
+        for (let i = 0; i<rows;i++){
+            pieces1.push([i, 25]);
+        }
+
+        // console.log(pieces1);
+
+
+        let pieces2 = []
+        for (let i = 0; i<rows;i++){
+            pieces2.push([i, 35]);
+        }
+
+        let pieces3 = []
+        // for (let i = 30; i<39;i++){
+        //     pieces3.push([i, 31]);
+        //     pieces3.push([i, 30]);
+        //
+        // }
+
+        fobs = [...pieces1, ...pieces2, ...pieces3];
+        // fobs.push([...pieces2]);
+        // console.log(fobs);
+
+        obstacles = fobs;
+
+        for (let i = 16;i<19;i++){
+
+            addColumnAgentGroup(agentData, 16, RADIUS * 3, {
+                    x: 25,
+                    z: -48.5 + i * 2
+                }, {
+                    x: -65,
+                    z: -16.5
+                },
+                0.8, "X", 3, -1, 1);
+
+        }
+
+
+        // randomize speed
+        agentData.forEach(function (a){
+            a.v_pref = getRandomFloat(0.4, 1.2, 1);
+            a.vm = a.v_pref;
+        })
+
+    }
+
 
     function defaultAgentConfiguration(){
 
@@ -2232,6 +2166,7 @@ function init() {
     // escapeScenario();
     // obstacleOnlyEscapeScenario();
     simpleHallwayAgentConfiguration();
+    // simpleHallwayHalfAgentConfiguration();
 
 
 
