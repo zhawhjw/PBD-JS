@@ -488,47 +488,6 @@ function getElementsInsideSquare(T, K) {
 }
 
 
-function findGridNeighbors(grids) {
-    // const neighborsMap = new Map();
-
-    // Iterate over each grid
-    for (const grid of grids) {
-        const { x, z } = grid;
-
-        const neighbors = [];
-
-        // Check adjacent neighbors
-        for (let i = -1; i <= 1; i++) {
-            for (let j = -1; j <= 1; j++) {
-                if (i === 0 && j === 0) {
-                    continue; // Skip the current grid itself
-                }
-
-
-
-                // const neighborX = x + i * 10;
-                // const neighborZ = z + j * 10;
-                // const neighbor = grids.find(g => g.x === neighborX && g.z === neighborZ && g.x <= x   );
-                const neighbor = grids.find(g =>
-                    !arrayContainsObject(neighbors, g)
-                    && (PHY.distance(x, z, g.x, g.z) - 10 < 0.1)
-                    && g.x <= x
-                    && ((z >=0 && g.z <= z) || (z < 0 && g.z >= z))
-
-                );
-
-                if (neighbor) {
-                    neighbors.push(neighbor);
-                }
-            }
-        }
-
-        grid.neighbors = neighbors;
-        // neighborsMap.set(grid, neighbors);
-    }
-
-    // return neighborsMap;
-}
 
 function cut(){
     let world_width = world.x;
@@ -597,7 +556,7 @@ function gridization(){
     // set flow field
     let columnWidth = tiles[0].length;
     let vectors = makeFlowField();
-    console.log(vectors);
+    // console.log(vectors);
     for (const row of vectors) {
         for (const column of row){
             let cell = column;
@@ -757,145 +716,7 @@ function gridization(){
 
     });
 
-
-    // make a flow field liked large grid space
-    // let world_width = world.x;
-    // let world_height = world.z;
-    //
-    // let tile_width = tile.w * 5;
-    // let tile_height = tile.h * 5;
-    //
-    // let Rs =   Math.floor(world_width / tile_width);
-    // let Cs = Math.floor(world_height / tile_height);
-    //
-    // if (world_width % tile_height !== 0){
-    //     Rs += 1;
-    // }
-    //
-    // if (world_height % tile_height !== 0){
-    //     Cs += 1;
-    // }
-    //
-    //
-    // for (let i = 0; i< Rs;i++) {
-    //     vecField[i] = [];
-    //
-    //     for (let j = 0; j < Cs; j++) {
-    //
-    //
-    //         const objectCenterPosition = {
-    //             x: start_point.x + WORLDUNIT * 5 + i * tile.w * 5,
-    //             y: 1,
-    //             z: start_point.z + WORLDUNIT * 5 + j * tile.h * 5,
-    //         };
-    //
-    //         const object_position = {
-    //             x: start_point.x + i * tile.w * 5,
-    //             z: start_point.z + j * tile.h * 5,
-    //         };
-    //
-    //         vecField[i][j] = new VecTile(i, j,
-    //             objectCenterPosition.x,
-    //             objectCenterPosition.z,
-    //             object_position,
-    //             {x:object_position.x + tile.w * 5, z: object_position.z},
-    //             {x:object_position.x , z: object_position.z + tile.h * 5},
-    //             {x:object_position.x + tile.w * 5, z: object_position.z + tile.h * 5},
-    //             [0, 0]
-    //         );
-    //     }
-    //
-    // }
-
-    // vector flow field
-
-
-
-
-    // console.log(vecField);
-
-    // let renderCandidates = [];
-    //
-    //
-    //
-    // for (let i = 0; i< Rs;i++) {
-    //     for (let j = 0; j < Cs; j++) {
-    //         let t = vecField[i][j];
-    //         renderCandidates.push(t);
-    //     }
-    // }
-    //
-    //
-    // let realObstacles = [];
-    // obstacles.forEach(function (o){
-    //     let t = tiles[o[0]][o[1]];
-    //     realObstacles.push([t.x, t.z]);
-    // });
-    //
-    // let elementsInsideSquare = getElementsInsideSquare(renderCandidates, realObstacles);
-    // // console.log(elementsInsideSquare);
-    //
-    // let complements = [];
-    // elementsInsideSquare.forEach(function (t){
-    //     for (let i = 0;i<renderCandidates.length;i++){
-    //         let st = renderCandidates[i];
-    //
-    //         if (st.x > t.x && t.z === st.z){
-    //
-    //             if(!arrayContainsObject(complements, st) && !arrayContainsObject(elementsInsideSquare, st)){
-    //                 complements.push(st);
-    //
-    //             }
-    //
-    //         }
-    //     }
-    // });
-    //
-    // // console.log(complements);
-    //
-    // let temp = []
-    // temp = [
-    //     ...elementsInsideSquare.slice(3, 4),
-    //     ...elementsInsideSquare.slice(5, 6),
-    //     ...elementsInsideSquare.slice(11, 16),
-    //
-    //     // ...elementsInsideSquare.slice(25, 30),
-    //     ...complements.slice(0, 18),
-    //     ...complements.slice(38, 58),
-    //
-    // ];
-    //
-    // temp.forEach(function (t, index){
-    //     t.index = index;
-    // });
-    //
-    // findGridNeighbors(temp);
-    // // console.log(elementsInsideSquare);
-    // availableVecField = temp;
-    //
-    //
-    // availableVecField.forEach(function (t){
-    //     const geometry = new THREE.BoxGeometry(tile.w * 5, WORLDUNIT * 2 , tile.h * 5);
-    //
-    //     let material = new THREE.MeshStandardMaterial({
-    //         transparent: true,
-    //         opacity: 0.5,
-    //         color: 0x00ff00 // set a color to disable the transparent effect
-    //     });
-    //
-    //
-    //
-    //     // Create a mesh by combining the geometry and the material
-    //     const cube = new THREE.Mesh(geometry, material);
-    //     cube.position.set(t.x, 1, t.z);
-    //
-    //     densityGrid.push(cube);
-    //
-    //     // Add the mesh to the scene
-    //     // scene.add(cube);
-    // });
-
-    const fontLoader = new FontLoader();
+    // const fontLoader = new FontLoader();
 
     // tiles.forEach(function (item, index){
     //     fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function (font) {
@@ -1043,7 +864,7 @@ function init() {
         vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
         vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
 
-        velocityMagnitude = getRandomFloat(0.4, 1.2, 1);
+        // velocityMagnitude = getRandomFloat(0.4, 1.2, 1);
 
         if (direction === "X") {
             dx = spacing;
@@ -1071,6 +892,8 @@ function init() {
                 vy: 0.0,
                 vz: vz,
                 v_pref: velocityMagnitude,
+                vm: velocityMagnitude,
+
                 // v_pref: 0.8,
 
                 radius: RADIUS,
@@ -1098,7 +921,6 @@ function init() {
 
                 modifier:1,
 
-                vm: velocityMagnitude,
 
                 minVariance: getRandomFloat(0.5, 1.5, 1),
                 variance: getRandomFloat(1.5, 2.5, 1),
@@ -1245,6 +1067,42 @@ function init() {
 
     }
 
+    function blueNoiseSampling(width, height, numSamples, k = 10, D = 2 * RADIUS) {
+        const samples = [];
+
+        const distance = (p1, p2) => {
+            const dx = p1[0] - p2[0];
+            const dy = p1[1] - p2[1];
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        for (let i = 0; i < numSamples; i++) {
+            let bestCandidate = null;
+            let bestDistance = 0;
+
+            for (let j = 0; j < k; j++) {
+                const candidate = [Math.random() * width, Math.random() * height];
+                let minDistance = Infinity;
+
+                for (const sample of samples) {
+                    const dist = distance(candidate, sample);
+                    minDistance = Math.min(minDistance, dist);
+                }
+
+                if (minDistance > bestDistance) {
+                    bestDistance = minDistance;
+                    bestCandidate = candidate;
+                }
+            }
+
+            if (bestDistance >= D) {
+                samples.push(bestCandidate);
+            }
+        }
+
+        return samples;
+    }
+
     function simpleHallwayAgentConfiguration(){
 
         plannerMode = 3;
@@ -1259,56 +1117,35 @@ function init() {
             pieces1.push([i, 25]);
         }
 
-        // console.log(pieces1);
-
-
         let pieces2 = []
         for (let i = 0; i<rows;i++){
             pieces2.push([i, 35]);
         }
 
-        let pieces3 = []
-        // for (let i = 30; i<39;i++){
-        //     pieces3.push([i, 31]);
-        //     pieces3.push([i, 30]);
-        //
-        // }
-
-        fobs = [...pieces1, ...pieces2, ...pieces3];
-        // fobs.push([...pieces2]);
-        // console.log(fobs);
+        fobs = [...pieces1, ...pieces2];
 
         obstacles = fobs;
 
-        for (let i = 16;i<23;i++){
 
-            addColumnAgentGroup(agentData, 16, RADIUS * 3, {
-                    x: 25,
-                    z: -48.5 + i * 2
+        let height = Math.abs(pieces2[0][1] - 20) ;
+        let width = 70 - 25 - 2 * RADIUS;
+
+        // console.log(pieces1[0][1]);
+        // console.log(height);
+
+        let sampled = blueNoiseSampling(width, height, 150, 30);
+
+        console.log(sampled);
+
+        sampled.forEach(function (agent){
+            addColumnAgentGroup(agentData, 1, 0, {
+                    x: agent[0],
+                    z: agent[1] - 17
                 }, {
-                    x: -65,
-                    z: -16.5
+                    x: agent[0] - 9999,
+                    z: agent[1] - 17
                 },
-                0.8, "X", 3, -1, 1);
-
-        }
-
-        // for(let i = 18; i< 25;i++){
-        //     addColumnAgentGroup(agentData, 16, RADIUS * 3, {
-        //             x: -70,
-        //             z: -49 + i * 2
-        //         }, {
-        //             x: 65,
-        //             z: -3
-        //         },
-        //         0.8, "X", 3, 1, 2);
-        // }
-
-
-
-        agentData.forEach(function (a){
-            a.v_pref = getRandomFloat(0.4, 1.2, 1);
-            a.vm = a.v_pref;
+                getRandomFloat(0.4, 1.2, 1), "X", 3, -1, 1);
         })
 
     }
@@ -1350,6 +1187,7 @@ function init() {
 
         for (let i = 16;i<19;i++){
 
+            let ran = getRandomFloat(0.4, 1.2, 1);
             addColumnAgentGroup(agentData, 16, RADIUS * 3, {
                     x: 25,
                     z: -48.5 + i * 2
@@ -1357,7 +1195,7 @@ function init() {
                     x: -65,
                     z: -16.5
                 },
-                0.8, "X", 3, -1, 1);
+                ran, "X", 3, -1, 1);
 
         }
 
@@ -3098,21 +2936,17 @@ function animate() {
 
         // console.log(availableVecField);
         let color;
-        // if(plannerMode !==3){
-        //     // setMeshColor(member.agent, normalize(0, member.v_pref, member.vm));
-        //     color = interpolateColor("2c2cce", "ff00a0", normalize(0, member.v_pref, member.vm));
-        //     // Set the color of the mesh
-        //
-        //     member.agent.material.color.set(color);
-        // }
 
         if (plannerMode !== 3){
             color = interpolateColor("2c2cce", "ff00a0", normalize(0, member.v_pref, member.vm));
+
+
             member.agent.material.color.set(color);
         }else {
             if(member.group_id === 1){
-                color = interpolateColor("f0ceff", "9300ff", normalize(0, member.v_pref, member.vm));
-                // color = interpolateColor("2c2cce", "ff00a0", normalize(0, member.v_pref, member.vm));
+                // color = interpolateColor("f0ceff", "9300ff", normalize(0, member.v_pref, member.vm));
+                color = interpolateColor("2c2cce", "4fce2c", normalize(0, member.v_pref, member.vm));
+
                 member.agent.material.color.set(color);
             }else if(member.group_id === 2){
                 color = interpolateColor("a5d6a7", "1b5e20", normalize(0, member.v_pref, member.vm));
@@ -3316,9 +3150,9 @@ gridization();
 render();
 animate();
 
-let intervalId = window.setInterval(function(){
-    performAStar();
-}, 5000);
+// let intervalId = window.setInterval(function(){
+//     performAStar();
+// }, 5000);
 
 // if (plannerMode !==3){
 //     let intervalId = window.setInterval(function(){

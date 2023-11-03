@@ -672,7 +672,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
             const follower_position = new THREE.Vector3( item.x, 0, item.z );
             const checkedPoint_position = new THREE.Vector3( checkedAgent.x, 0, checkedAgent.z );
-            const follower_dir = new THREE.Vector3( item.vx, 0, item.vz );
+            const follower_dir = new THREE.Vector3( -1, 0, 0 );
             const direction = follower_dir.normalize();
 
             let flag2 = isAgentInFront90(follower_position, checkedPoint_position, direction)
@@ -990,10 +990,11 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
         const estStep = 0.1;
         let stepVectors = [
-            {x: 0, z:1},
-            {x:-1, z:1},
+            {x: 0, z: 1},
+            {x:-1, z: 1},
+            {x:-1, z: 0},
             {x:-1, z:-1},
-            {x:0, z:-1}
+            {x:0,  z:-1}
         ];
 
         // stepVectors = getEmptySpaceVectors({x: 0, z:1}, 15);
@@ -1040,7 +1041,12 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
             let scalar = smoothKernel(4 * RADIUS, dist);
             let correctedVm = agent_i.vm - scalar * agent_i.vm;
-
+            // 1. color: green -> blue high v -> low v
+            // 2. need to focus only on predicted position
+            // 3. following is not just go to behind that person but can keep the distance with that leader while direction remains same
+            // 4. need to change the position of agents: use blue noise, try to mimic the one in paper Realistic Following then create something simpler
+            // 5. implement the Realistic Following behavior (create new script alone)
+            // FROM BOTTOM to TOP
             agent_i.px = agent_i.x + kPrime * correctedDirNorm.x * correctedVm * timestep;
             agent_i.pz = agent_i.z + kPrime * correctedDirNorm.z * correctedVm * timestep;
 
@@ -1052,19 +1058,13 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
                 let targetDensity = Math.min(...stepDensities);
                 let index = stepDensities.indexOf(targetDensity);
                 velocity = stepVectors[index];
-                // velocity = agent_i.scenarioVec;
 
-                // let k = 0.1;
-                // velocity = weightedInterpolation(velocity, normalizeVector2D({x:agent_i.vx, z: agent_i.vz}), k, 1-k);
             }else{
                 velocity = agent_i.scenarioVec;
 
             }
 
             let smoothVelocity = velocity;
-
-
-
 
             agent_i.px =  agent_i.x + kPrime * smoothVelocity.x * agent_i.v_pref * timestep;
             agent_i.pz =  agent_i.z + kPrime * smoothVelocity.z * agent_i.v_pref * timestep;
@@ -1519,7 +1519,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     // found proper leader for each agent
     // findLeader();
 
-    let stiffnessFactor = 0.1;
+    let stiffnessFactor = 0.7;
     // sceneEntities.forEach(function (item){
     //
     //      followingV5(item, 1, stiffnessFactor);
