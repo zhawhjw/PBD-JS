@@ -204,6 +204,161 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return relative;
     }
 
+
+    function agentVelocityPlannerV5(){
+        sceneEntities.forEach(function (item){
+
+            let velocity = item.scenarioVec;
+
+            const dir_x = velocity.x;
+            const dir_z = velocity.z;
+            item.vx = item.vm * dir_x;
+            item.vz = item.vm * dir_z;
+
+
+        });
+    }
+
+    function findPerpendicularPoints(vector, point, distance) {
+
+        const magnitude = Math.sqrt(vector.x * vector.x + vector.z * vector.z);
+
+        // Calculate the multiplier for the distance to get the offset
+        const t = distance / magnitude;
+
+        // Calculate the coordinates of the two points
+        const point1 = {
+            x: point.x - t * vector.z,
+            z: point.z + t * vector.x
+        };
+        const point2 = {
+            x: point.x + t * vector.z,
+            z: point.z - t * vector.x
+        };
+
+
+        // Return both points
+        return [point1, point2];
+    }
+
+    function lineIntersectsCircle(ahead1, ahead2, item){
+        return distance(item.x, item.z,  ahead1.x, ahead1.z) <= RADIUS || distance(item.x, item.z,  ahead2.x, ahead2.z) <= RADIUS;
+    }
+
+    function findMostClosestAgent(currentAgent, allAgents, ahead1, ahead2){
+
+        let mostClosest = null;
+
+        for (let i = 0; i < allAgents.length; i++) {
+
+            let agent = allAgents[i];
+
+            if (agent.index === currentAgent.index){
+                continue;
+            }
+
+            let intersect  = lineIntersectsCircle(ahead1, ahead2, agent);
+
+            if (intersect &&
+                (mostClosest == null ||
+                    distance(currentAgent.x, currentAgent.z, agent.x, agent.z) < distance(currentAgent.x, currentAgent.z, mostClosest.x, mostClosest.z)
+                )
+            ) {
+
+                mostClosest = agent;
+
+            }
+
+        }
+
+        return mostClosest;
+
+    }
+
+    function getVectorMagnitude(vector){
+        return Math.sqrt(vector.x * vector.x + vector.z * vector.z);
+    }
+
+    function getUnitVector(vector){
+        // Define the 2D vector
+        // const vector = { x: 3, y: 4 }; // Example vector
+
+        // Calculate the magnitude (length) of the vector
+        let magnitude = getVectorMagnitude(vector);
+
+        if (magnitude === 0){
+            magnitude = 1;
+        }
+        // Calculate the unit vector
+        return {
+            x: vector.x / magnitude,
+            z: vector.z / magnitude
+        };
+    }
+
+    function kernel(dist, yMax, minBuffer, maxBuffer){
+        let v;
+
+        if (dist < minBuffer){
+            v = 0;
+        }else if(dist > maxBuffer){
+            v = yMax;
+        }else {
+            let slope = yMax / (maxBuffer - minBuffer);
+            let bias = slope * minBuffer;
+
+            v = slope * dist - bias;
+        }
+
+        return v;
+    }
+
+    function kernel2(dist, yMax, minBuffer, maxBuffer){
+        let v;
+
+        if (dist < minBuffer){
+            v = yMax;
+        }else if(dist > maxBuffer){
+            v = 0;
+        }else {
+            let slope = - yMax / (maxBuffer - minBuffer);
+            let bias = - slope * maxBuffer;
+
+            v = slope * dist + bias;
+        }
+
+        return v;
+    }
+
+    function calculateAlignmentSteering(agent, agentGroups) {
+
+        let averageHeading = { x: 0, z: 0 };
+
+        if (agentGroups.length === 0) {
+            return averageHeading;
+        }
+
+
+        for (let i = 0; i < agentGroups.length; i++) {
+            averageHeading.x += agentGroups[i].vx;
+            averageHeading.z += agentGroups[i].vz;
+        }
+
+        averageHeading.x /= agentGroups.length;
+        averageHeading.z /= agentGroups.length;
+
+
+        let magnitude = Math.sqrt(averageHeading.x * averageHeading.x + averageHeading.z * averageHeading.z);
+        averageHeading.x /= magnitude;
+        averageHeading.z /= magnitude;
+
+
+
+        return averageHeading;
+    }
+
+
+
     /*  -----------------------  */
 
 
@@ -214,31 +369,72 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     const ITERNUM =3;
     const KSI = 0.01;
 
+    const OUTER = 5*RADIUS;
+    const INNER = 3*RADIUS;
+
+    const ahead1 = OUTER - RADIUS;
+    const ahead2 = INNER - RADIUS;
+
     let C = getConstant();
-    // let TAU = getTau();
+    let TAU = getTau();
     let GAMMA = getGamma();
 
 
-    // find leader
-    sceneEntities.forEach(function (item){
-        item.waitAgent = pickAgent(item, sceneEntities);
-    })
+    agentVelocityPlannerV5();
+
+    // // find leader
+    // sceneEntities.forEach(function (item){
+    //     item.waitAgent = pickAgent(item, sceneEntities);
+    // })
+    //
+    //
+    // sceneEntities.forEach(function (item){
+    //     item.prev_vx = item.vx;
+    //     item.prev_vy = item.vy;
+    //     item.prev_vz = item.vz;
+    //
+    //     // get relative speed
+    //     let relative_vx = getRelativeSpeed(item);
+    //     let relative_vz = 0; // according to the video, there is no vz
+    //
+    //     let ax = C * relative_vx * Math.pow(getDensity(item), GAMMA);
+    //     let az = C * relative_vz * Math.pow(getDensity(item), GAMMA);
+    //
+    //     item.vx = item.prev_vx + ax * timestep;
+    //     item.vz = item.prev_vz + az * timestep;
+    //
+    //
+    // });
+    //
+
+    sceneEntities.forEach(function (item) {
+        //
+        // let a1 = {x:item.x + -1 * ahead1, z:item.z + 0 * ahead1 };
+        // let a2 = {x:item.x + -1 * ahead2, z:item.z + 0 * ahead2 };
+        //
+        let closet = pickAgent(item, sceneEntities);
+
+        let averageFlowDir = calculateAlignmentSteering(item, item.cachedAgents);
+
+        let velocity = item.scenarioVec;
+        const dir_x = velocity.x + averageFlowDir.x;
+        const dir_z = velocity.z + averageFlowDir.z;
+
+        let newV = item.v_pref;
+
+        if(closet){
+            let dist = distance(closet.x, closet.z, item.x, item.z);
+
+            let arriveV = kernel2(dist, item.v_pref, INNER, OUTER);
+
+            newV -= arriveV;
 
 
-    sceneEntities.forEach(function (item){
-        item.prev_vx = item.vx;
-        item.prev_vy = item.vy;
-        item.prev_vz = item.vz;
 
-        // get relative speed
-        let relative_vx = getRelativeSpeed(item);
-        let relative_vz = 0; // according to the video, there is no vz
+        }
 
-        let ax = C * relative_vx * Math.pow(getDensity(item), GAMMA);
-        let az = C * relative_vz * Math.pow(getDensity(item), GAMMA);
-
-        item.vx = item.prev_vx + ax * timestep;
-        item.vz = item.prev_vz + az * timestep;
+        item.vx = newV * dir_x;
+        item.vz = newV * dir_z;
 
 
     });
@@ -255,6 +451,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
     });
 
+
+
     let pbdIters = 0;
     let agent_a, agent_b, desDistance, i, j, idx = 0;
 
@@ -265,7 +463,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
         while(j<sceneEntities.length)
         {
-            collisionConstraint(sceneEntities[i],sceneEntities[j]);
+            // collisionConstraint(sceneEntities[i],sceneEntities[j]);
             j+=1;
         }
         i+=1
@@ -321,6 +519,14 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         {
             item.z= world.z/2;
         }
+
+        // if(item.group_id === 1) {
+        //
+        //     if (item.x <= -69) {
+        //         item.x = world.x / 2;
+        //         item.z = item.sz;
+        //     }
+        // }
 
     });
 

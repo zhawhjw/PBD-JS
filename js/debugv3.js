@@ -852,7 +852,7 @@ function init() {
 
 
     function addColumnAgentGroup(agentData, numAgents, spacing,startPos, goalPos,velocityMagnitude, direction,
-                                 mode = 2, dir = 0, g_id = 1) {
+                                 mode = 2, dir = 0, dirz = 0,  g_id = 1) {
         let i = 0;
         let initalIdx = agentData.length;
         let dx = 0,
@@ -955,7 +955,7 @@ function init() {
                 noFollowingTimer:-1,
                 freezeTimer:-1,
 
-                scenarioVec: {x:dir, z:0},
+                scenarioVec: {x:dir, z:dirz},
                 scenarioGoal: {x: dir * 100, z:startPos.z + dz * i},
                 cachedSurroundAgents:[],
                 cachedAgents:[],
@@ -1103,6 +1103,75 @@ function init() {
         return samples;
     }
 
+    function simpleHallwayTest(){
+
+        plannerMode = 3;
+
+        [rows, columns] = cut();
+
+        let fobs = []
+
+
+        let pieces1 = []
+        for (let i = 0; i<rows;i++){
+            pieces1.push([i, 25]);
+        }
+
+        let pieces2 = []
+        for (let i = 0; i<rows;i++){
+            pieces2.push([i, 50]);
+        }
+
+        fobs = [...pieces1, ...pieces2];
+
+        obstacles = fobs;
+
+
+        let height = Math.abs(pieces2[0][1] - 25) ;
+        let width = 100;
+
+
+        let sampled = blueNoiseSampling(width, height, 100, 30);
+
+        console.log(sampled);
+
+        sampled.forEach(function (agent){
+            addColumnAgentGroup(agentData, 1, 0, {
+                    x: agent[0] - 55,
+                    z: agent[1] - 17
+                }, {
+                    x: agent[0] - 9999,
+                    z: agent[1] - 17
+                },
+                getRandomFloat(0.4, 1.2, 1), "X", 3, -1, 0, 1);
+        })
+
+        // let sampled = [
+        //
+        //     [0, 0, 1.2, -1, 0],
+        //     [-5, 1, 0.4, -1, 0],
+        //     [-7, -1, 0.4, -1, -1],
+        //     [-5, -1, 0.4, -1, -1],
+        //     [-5, 3, 0.3, -1, 1],
+        //
+        // ]
+        //
+        // sampled.forEach(function (agent){
+        //     addColumnAgentGroup(agentData, 1, 0, {
+        //             x: agent[0],
+        //             z: agent[1]
+        //         }, {
+        //             x: agent[0] - 9999,
+        //             z: agent[1]
+        //         },
+        //         agent[2], "X", 3, agent[3], agent[4], 1);
+        // });
+
+
+
+
+    }
+
     function simpleHallwayAgentConfiguration(){
 
         plannerMode = 3;
@@ -1119,7 +1188,7 @@ function init() {
 
         let pieces2 = []
         for (let i = 0; i<rows;i++){
-            pieces2.push([i, 35]);
+            pieces2.push([i, 50]);
         }
 
         fobs = [...pieces1, ...pieces2];
@@ -1127,19 +1196,17 @@ function init() {
         obstacles = fobs;
 
 
-        let height = Math.abs(pieces2[0][1] - 20) ;
-        let width = 70 - 25 - 2 * RADIUS;
+        let height = Math.abs(pieces2[0][1] - 25) ;
+        let width = 100;
 
-        // console.log(pieces1[0][1]);
-        // console.log(height);
 
-        let sampled = blueNoiseSampling(width, height, 150, 30);
+        let sampled = blueNoiseSampling(width, height, 100, 30);
 
         console.log(sampled);
 
         sampled.forEach(function (agent){
             addColumnAgentGroup(agentData, 1, 0, {
-                    x: agent[0],
+                    x: agent[0] - 55,
                     z: agent[1] - 17
                 }, {
                     x: agent[0] - 9999,
@@ -2003,9 +2070,9 @@ function init() {
     // oneDirHallwayAgentConfiguration();
     // escapeScenario();
     // obstacleOnlyEscapeScenario();
-    simpleHallwayAgentConfiguration();
+    // simpleHallwayAgentConfiguration();
     // simpleHallwayHalfAgentConfiguration();
-
+    simpleHallwayTest();
 
 
 
@@ -2428,7 +2495,7 @@ function mouseDown(event) {
 
         console.log(agentData[selected]);
 
-
+        agentData[selected].v_pref += 0.1;
 
         break;
     }

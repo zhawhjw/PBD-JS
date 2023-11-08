@@ -1043,7 +1043,7 @@ function init() {
         vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
         vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
 
-        velocityMagnitude = getRandomFloat(0.4, 1.2, 1);
+        // velocityMagnitude = getRandomFloat(0.4, 1.2, 1);
 
         if (direction === "X") {
             dx = spacing;
@@ -1245,6 +1245,50 @@ function init() {
 
     }
 
+    function simpleHallwayTest(){
+
+        plannerMode = 3;
+
+        [rows, columns] = cut();
+
+        let fobs = []
+
+
+        let pieces1 = []
+        for (let i = 0; i<rows;i++){
+            pieces1.push([i, 25]);
+        }
+
+        let pieces2 = []
+        for (let i = 0; i<rows;i++){
+            pieces2.push([i, 50]);
+        }
+
+        fobs = [...pieces1, ...pieces2];
+
+        obstacles = fobs;
+
+
+
+
+        let sampled = [
+            [0, 0, 1.2],
+            [-5, 0, 0.4]
+        ]
+
+        sampled.forEach(function (agent){
+            addColumnAgentGroup(agentData, 1, 0, {
+                    x: agent[0],
+                    z: agent[1]
+                }, {
+                    x: agent[0] - 9999,
+                    z: agent[1]
+                },
+                agent[2], "X", 3, -1, 1);
+        })
+
+    }
+
     function simpleHallwayAgentConfiguration(){
 
         plannerMode = 3;
@@ -1279,6 +1323,7 @@ function init() {
         // console.log(fobs);
 
         obstacles = fobs;
+        // obstacles = [];
 
         for (let i = 16;i<23;i++){
 
@@ -2165,9 +2210,9 @@ function init() {
     // oneDirHallwayAgentConfiguration();
     // escapeScenario();
     // obstacleOnlyEscapeScenario();
-    simpleHallwayAgentConfiguration();
+    // simpleHallwayAgentConfiguration();
     // simpleHallwayHalfAgentConfiguration();
-
+    simpleHallwayTest();
 
 
 
@@ -3316,9 +3361,9 @@ gridization();
 render();
 animate();
 
-let intervalId = window.setInterval(function(){
-    performAStar();
-}, 5000);
+// let intervalId = window.setInterval(function(){
+//     performAStar();
+// }, 5000);
 
 // if (plannerMode !==3){
 //     let intervalId = window.setInterval(function(){

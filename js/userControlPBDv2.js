@@ -975,7 +975,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     function getEmptySpaceVectors(baseVector, baseAngle){
         let candidates = [];
         // let baseAngle = 15;
-        let num = 180 / baseAngle;
+        let num = 90 / baseAngle;
 
         for (let i = 0;i<num;i++){
             let angle = baseAngle + baseAngle * i;
@@ -997,7 +997,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             {x:0,  z:-1}
         ];
 
-        // stepVectors = getEmptySpaceVectors({x: 0, z:1}, 15);
+        stepVectors = getEmptySpaceVectors({x: -1, z:1}, 5);
 
 
         let stepDensities = [
@@ -1026,11 +1026,12 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
 
         let kPrime = 1.0 - Math.pow((1.0 - k), (1.0 / iter));
+        // let kPrime = 1.0;
+
 
         if(
             agent_i.waitAgent &&
-            // agent_i.vm > 0.5 * agent_i.v_pref
-            agent_i.waitAgent.vm - agent_i.v_pref < 0.1 &&
+            Math.abs(agent_i.waitAgent.vm - agent_i.vm) < 0.1 &&
             Math.min(...stepDensities) >= 0
 
         ){
@@ -1041,16 +1042,25 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
             let scalar = smoothKernel(4 * RADIUS, dist);
             let correctedVm = agent_i.vm - scalar * agent_i.vm;
+            // modified_vel_magnitude = (current_magnitude/dcurrent_distance_btwn_leader_follower)
+
             // 1. color: green -> blue high v -> low v
             // 2. need to focus only on predicted position
             // 3. following is not just go to behind that person but can keep the distance with that leader while direction remains same
             // 4. need to change the position of agents: use blue noise, try to mimic the one in paper Realistic Following then create something simpler
             // 5. implement the Realistic Following behavior (create new script alone)
             // FROM BOTTOM to TOP
+
+            // agent_i.px =  agent_i.px + delta_p
+
             agent_i.px = agent_i.x + kPrime * correctedDirNorm.x * correctedVm * timestep;
             agent_i.pz = agent_i.z + kPrime * correctedDirNorm.z * correctedVm * timestep;
 
+            console.log("Constraint");
+
         }else {
+            console.log("NOT Constraint");
+
             agent_i.waitAgent = null;
             let velocity;
 
@@ -1320,7 +1330,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         sceneEntities.forEach(function (item){
 
             let velocity = item.scenarioVec;
-
+            // {x:-1, z:0}
             const dir_x = velocity.x;
             const dir_z = velocity.z;
             item.vx = item.vm * dir_x;
@@ -1503,8 +1513,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         // if (!z_sign) item.prev_vz = 0;
 
         // need to be revised
-        item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
-        item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
+        // item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
+        // item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
 
         item.px = item.x + timestep*item.vx;
         item.pz = item.z + timestep*item.vz;
@@ -1522,7 +1532,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     let stiffnessFactor = 0.7;
     // sceneEntities.forEach(function (item){
     //
-    //      followingV5(item, 1, stiffnessFactor);
+    //      followingV5(item, 1, 1);
     // });
 
     while(pbdIters<ITERNUM)
@@ -1581,7 +1591,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
         item.vx = (item.px-item.x)/timestep;
         item.vz = (item.pz-item.z)/timestep;
-        item.vy = (item.py-item.y)/timestep;
+        // item.vy = (item.py-item.y)/timestep;
 
         item.vm = Math.sqrt(item.vx * item.vx + item.vz * item.vz);
         // console.log(item.vm);
