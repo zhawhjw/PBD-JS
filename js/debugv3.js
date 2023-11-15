@@ -63,7 +63,10 @@ class VecTile {
 }
 
 let m;
-
+let customDict = {
+    stop:false,
+    globalTimestamp:0
+};
 let renderer, scene, camera;
 let world = {
     x: 140,
@@ -111,6 +114,7 @@ const blueAgentMaterial = new THREE.MeshLambertMaterial({
 const redAgentMaterial = new THREE.MeshLambertMaterial({
     color: 0xff0000
 });
+let globalTimestamp = 0;
 
 const stats = new Stats();
 document.body.appendChild(stats.dom)
@@ -859,10 +863,10 @@ function init() {
             dz = 0,
             vx = 0,
             vz = 0;
-        let distanceToGoal = PHY.distance(startPos.x, startPos.z,
-            goalPos.x, goalPos.z);
-        vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
-        vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
+        // let distanceToGoal = PHY.distance(startPos.x, startPos.z,
+        //     goalPos.x, goalPos.z);
+        // vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
+        // vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
 
         // velocityMagnitude = getRandomFloat(0.4, 1.2, 1);
 
@@ -893,7 +897,7 @@ function init() {
                 vz: vz,
                 v_pref: velocityMagnitude,
                 vm: velocityMagnitude,
-
+                backupVm: velocityMagnitude,
                 // v_pref: 0.8,
 
                 radius: RADIUS,
@@ -959,6 +963,8 @@ function init() {
                 scenarioGoal: {x: dir * 100, z:startPos.z + dz * i},
                 cachedSurroundAgents:[],
                 cachedAgents:[],
+                cachedVelocity: [],
+                reqPreVel:null,
 
             });
             i += 1;
@@ -971,10 +977,10 @@ function init() {
 
         let vx = 0,
             vz = 0;
-        let distanceToGoal = PHY.distance(startPos.x, startPos.z,
-            goalPos.x, goalPos.z);
-        vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
-        vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
+        // let distanceToGoal = PHY.distance(startPos.x, startPos.z,
+        //     goalPos.x, goalPos.z);
+        // vx = velocityMagnitude * (goalPos.x - startPos.x) / distanceToGoal;
+        // vz = velocityMagnitude * (goalPos.z - startPos.z) / distanceToGoal;
 
 
         agentData.push({
@@ -1067,7 +1073,7 @@ function init() {
 
     }
 
-    function blueNoiseSampling(width, height, numSamples, k = 10, D = 2 * RADIUS) {
+    function blueNoiseSampling(width, height, numSamples, k = 10, D = 2 * RADIUS + RADIUS) {
         const samples = [];
 
         const distance = (p1, p2) => {
@@ -1127,32 +1133,35 @@ function init() {
         obstacles = fobs;
 
 
-        let height = Math.abs(pieces2[0][1] - 25) ;
-        let width = 100;
+        let height = Math.abs(pieces2[0][1] - 5) ;
+        let width = 200;
 
 
-        let sampled = blueNoiseSampling(width, height, 100, 30);
+        let sampled = blueNoiseSampling(width, height, 800, 30, 2* RADIUS + 2 * RADIUS);
 
-        console.log(sampled);
 
         sampled.forEach(function (agent){
             addColumnAgentGroup(agentData, 1, 0, {
-                    x: agent[0] - 55,
+                    x: agent[0] - 45,
                     z: agent[1] - 17
                 }, {
                     x: agent[0] - 9999,
                     z: agent[1] - 17
                 },
-                getRandomFloat(0.4, 1.2, 1), "X", 3, -1, 0, 1);
+                getRandomFloat(1.2, 1.8, 1), "X", 3, -1, 0, 1);
         })
 
-        // let sampled = [
+
+
         //
-        //     [0, 0, 1.2, -1, 0],
-        //     [-5, 1, 0.4, -1, 0],
-        //     [-7, -1, 0.4, -1, -1],
-        //     [-5, -1, 0.4, -1, -1],
-        //     [-5, 3, 0.3, -1, 1],
+        // //
+        // let sampled = [
+        //     [-5, 1, 0.5, -1, 0],
+        //     [-0.2, 1.1, 1.1, -1, 0],
+        //     [5, 0.5, 1.8, -1, 0],
+        //     // [-7, -1, 0.4, -1, 0],
+        //     // [-9, -0, 0.8, -1, 0],
+        //     // [-5, 3, 0.3, -1, 0],
         //
         // ]
         //
@@ -1196,13 +1205,12 @@ function init() {
         obstacles = fobs;
 
 
-        let height = Math.abs(pieces2[0][1] - 25) ;
+        let height = Math.abs(pieces2[0][1] - 5) ;
         let width = 100;
 
 
-        let sampled = blueNoiseSampling(width, height, 100, 30);
+        let sampled = blueNoiseSampling(width, height, 500, 30);
 
-        console.log(sampled);
 
         sampled.forEach(function (agent){
             addColumnAgentGroup(agentData, 1, 0, {
@@ -1212,7 +1220,7 @@ function init() {
                     x: agent[0] - 9999,
                     z: agent[1] - 17
                 },
-                getRandomFloat(0.4, 1.2, 1), "X", 3, -1, 1);
+                getRandomFloat(1.2, 1.8, 1), "X", 3, -1, 0, 1);
         })
 
     }
@@ -2464,12 +2472,14 @@ function performAStar(){
     }
 }
 
+
 function rightClick(event) {
 
     event.preventDefault();
-    performAStar();
+    // performAStar();
 
-
+    customDict.stop = !customDict.stop;
+    console.log(customDict.stop);
 }
 
 function mouseDown(event) {
@@ -2945,7 +2955,7 @@ function animate() {
         // }
     });
 
-    PHY.step(RADIUS, agentData, pickableWall, world, WORLDUNIT, plannerMode, tiles, exits );
+    PHY.step(RADIUS, agentData, pickableWall, world, WORLDUNIT, plannerMode, tiles, exits, customDict );
     // const frameNumber = parseInt(document.getElementById('frame').value);
 
 

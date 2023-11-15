@@ -4,7 +4,7 @@ export function distance(x1, y1, x2, y2) {
     return Math.sqrt((x2-x1)*(x2-x1)+(y2-y1)*(y2-y1));
 }
 
-export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, mode, field, opens=[]) {
+export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, mode, field, opens=[], customParam) {
 
 
     function collisionConstraint(agent_i,agent_j)
@@ -64,87 +64,13 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
     }
 
-    function isAgentInFront90(agentA, agentB, direction) {
-        const difference = agentB.clone().sub(agentA);
-        const angle = difference.angleTo(direction);
-        return angle < Math.PI / 4; // Adjust this angle to control the "field of view" for agents.
-    }
-
-    function pickAgent(item, agents) {
-
-        let leader = null;
-
-        let speedWeight = 0.2;
-        let distWeight = 0.8;
-
-        let maxReward = -1;
-
-        let cachedAgents = [];
-        let cachedSurroundAgents = [];
-
-        for (let i = 0; i < agents.length; i++) {
-            const checkedAgent = agents[i];
-
-            if(item.index === checkedAgent.index){
-                continue;
-            }
-
-            if(checkedAgent.simEnd){
-                continue;
-            }
-
-            if(mode===3 && checkedAgent.group_id !== item.group_id){
-                continue;
-            }
-
-            const agentCentroidDist = distance(item.x, item.z, checkedAgent.x, checkedAgent.z);
-
-            // out of vision range
-            if (agentCentroidDist > 4 * RADIUS){
-                continue
-            }
 
 
-            cachedSurroundAgents.push(checkedAgent);
 
-            const follower_position = new THREE.Vector3( item.x, 0, item.z );
-            const checkedPoint_position = new THREE.Vector3( checkedAgent.x, 0, checkedAgent.z );
-            const follower_dir = new THREE.Vector3( item.vx, 0, item.vz );
-            const direction = follower_dir.normalize();
-
-            let flag2 = isAgentInFront90(follower_position, checkedPoint_position, direction)
-
-            // not in front of 90 degree of vision
-            if (!flag2){
-                continue
-            }
-
-            let leaderVelocity = checkedAgent.vm;
-
-            let reward = speedWeight * leaderVelocity + distWeight * (1 / (agentCentroidDist + 0.001))
-
-            if(reward > maxReward ){
-
-                // prevent deadlock
-                if(checkedAgent.waitAgent && checkedAgent.waitAgent.index !== item.index){
-                    continue
-                }
-
-                leader = checkedAgent;
-                maxReward = reward;
-                cachedAgents.push(checkedAgent);
-            }
-
-        }
-
-        item.cachedAgents = cachedAgents;
-        item.cachedSurroundAgents = cachedSurroundAgents;
-        return leader;
-    }
 
     function getConstant(){
         let constant = 1;
-        constant = 1.3; // 6.2 Macroscopic evaluation
+        constant = 5; // 6.2 Macroscopic evaluation
         return constant;
     }
 
@@ -185,24 +111,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return density;
     }
 
-    function getRelativeSpeed(agent){
 
-        let relative = 0;
-
-        if(agent.waitAgent){
-
-            let leader_vm = agent.waitAgent.vm;
-            let follower_vm = agent.vm;
-
-            if(follower_vm > leader_vm){
-
-                relative = follower_vm - leader_vm;
-            }
-
-        }
-
-        return relative;
-    }
 
 
     function agentVelocityPlannerV5(){
@@ -241,60 +150,15 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return [point1, point2];
     }
 
-    function lineIntersectsCircle(ahead1, ahead2, item){
-        return distance(item.x, item.z,  ahead1.x, ahead1.z) <= RADIUS || distance(item.x, item.z,  ahead2.x, ahead2.z) <= RADIUS;
-    }
 
-    function findMostClosestAgent(currentAgent, allAgents, ahead1, ahead2){
 
-        let mostClosest = null;
 
-        for (let i = 0; i < allAgents.length; i++) {
-
-            let agent = allAgents[i];
-
-            if (agent.index === currentAgent.index){
-                continue;
-            }
-
-            let intersect  = lineIntersectsCircle(ahead1, ahead2, agent);
-
-            if (intersect &&
-                (mostClosest == null ||
-                    distance(currentAgent.x, currentAgent.z, agent.x, agent.z) < distance(currentAgent.x, currentAgent.z, mostClosest.x, mostClosest.z)
-                )
-            ) {
-
-                mostClosest = agent;
-
-            }
-
-        }
-
-        return mostClosest;
-
-    }
 
     function getVectorMagnitude(vector){
         return Math.sqrt(vector.x * vector.x + vector.z * vector.z);
     }
 
-    function getUnitVector(vector){
-        // Define the 2D vector
-        // const vector = { x: 3, y: 4 }; // Example vector
 
-        // Calculate the magnitude (length) of the vector
-        let magnitude = getVectorMagnitude(vector);
-
-        if (magnitude === 0){
-            magnitude = 1;
-        }
-        // Calculate the unit vector
-        return {
-            x: vector.x / magnitude,
-            z: vector.z / magnitude
-        };
-    }
 
     function kernel(dist, yMax, minBuffer, maxBuffer){
         let v;
@@ -358,6 +222,135 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     }
 
 
+    // =======================//
+    // For Realistic Following//
+    //========================//
+
+    function getUnitVector(vector){
+        // Calculate the magnitude (length) of the vector
+        let magnitude = getVectorMagnitude(vector);
+
+        if (magnitude === 0){
+            magnitude = 1;
+        }
+        // Calculate the unit vector
+        return {
+            x: vector.x / magnitude,
+            z: vector.z / magnitude
+        };
+    }
+
+    function angleBtwnVecs(vecA, vecB, angleThreshold) {
+        const angle = vecA.angleTo(vecB);
+        return angle < angleThreshold; // Adjust this angle to control the "field of view" for agents.
+    }
+
+
+    function findPotentialLeaders(item, agents){
+        let candidates = [];
+
+        for (let i =0;i<agents.length;i++){
+
+            if(item.index === agents[i].index){
+                continue;
+            }
+
+            let followerUnitVec = getUnitVector({x:item.vx, z:item.vz});
+            let leadingUnitVec = getUnitVector({x:agents[i].vx, z:agents[i].vz});
+
+            let followerVec;
+            let leadingVec;
+            // need to check if the vector is zero
+            if (followerUnitVec.x === 0 && followerUnitVec.z === 0){
+                followerVec = new THREE.Vector3( item.scenarioVec.x, 0, item.scenarioVec.z );
+            }else {
+                followerVec = new THREE.Vector3( followerUnitVec.x, 0, followerUnitVec.z );
+            }
+
+            if (leadingUnitVec.x === 0 && leadingUnitVec.z === 0){
+                leadingVec = new THREE.Vector3( agents[i].scenarioVec.x, 0, agents[i].scenarioVec.z );
+            }else {
+                leadingVec = new THREE.Vector3( leadingUnitVec.x, 0, leadingUnitVec.z );
+            }
+
+
+            let delta_p_x = WALKINGDIR * (agents[i].x - item.x); // notice here the order is matter
+            let delta_p_y = Math.abs(item.z - agents[i].z); // while here order is ignored
+
+            //  a_v < e_a_f
+            let condition1 = angleBtwnVecs(followerVec, leadingVec, EPSILON_a_f);
+            // 0 < delta_p_x < e_p_x. This should be a distance vector (has direction)
+            let condition2 = (delta_p_x > 0 ) && (delta_p_x < EPSILON_p_x);
+            // let condition2 = (delta_p_x > 0 );
+
+            // delta_p_y < r1 + r2
+            let condition3 = delta_p_y < EPSILON_y;
+
+            if(condition1 && condition2 && condition3){
+                candidates.push(agents[i]);
+            }
+
+        }
+
+
+
+        return candidates;
+    }
+
+    function realisticFollowing(item, agents){
+
+        let potentialLeaders = findPotentialLeaders(item, agents);
+        let followingConditions = potentialLeaders.length > 0;
+
+        let acceleration;
+        let delta_v_x ;
+
+        if(followingConditions){
+
+            // 3.1.1 find nearest
+            let leader = null;
+            // This will be used to calculate acceleration
+            let minimum_delta_p_x = 999999;
+            for (let i =0; i<potentialLeaders.length;i++){
+                let delta_p_x = WALKINGDIR * (potentialLeaders[i].x - item.x); // order
+                if(delta_p_x<minimum_delta_p_x){
+                    minimum_delta_p_x = delta_p_x;
+                    leader = potentialLeaders[i];
+                }
+            }
+
+            item.waitAgent = leader
+
+
+            if(item.reqPreVel && leader.reqPreVel){
+                delta_v_x =  WALKINGDIR * (item.reqPreVel - leader.reqPreVel);
+
+            }else {
+                delta_v_x =  WALKINGDIR * (item.prev_vx - leader.prev_vx);
+            }
+            acceleration = 0.75 * delta_v_x / Math.pow(minimum_delta_p_x, 0.01);
+
+        }
+
+        // acceleration = C * delta_v_x / Math.pow(minimum_delta_p_x, GAMMA);
+
+        //
+        else {
+            // if no leader find,t can fulfill its preferred speed
+            // notice that this is  ithe special case for loop hallway walking simulation
+            // in reality, the leader will not be teleported to another side of hallway
+            // console.log("Trigger");
+            acceleration = 0.1* WALKINGDIR * (item.v_pref - Math.abs(item.prev_vx)) / timestep
+
+        }
+
+        // reserved for 3.12 "Towards more behaviours in crowd simulation"
+        // why max() here is -x is our walking direction
+        // acceleration = Math.max(acceleration, accelerationCA);
+
+        return acceleration;
+    }
+
 
     /*  -----------------------  */
 
@@ -365,79 +358,71 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     const WALLSIZE = WORLDUNIT;
     const AGENTSIZE = RADIUS * 2;
     const epsilon = 0.0001;
-    const timestep = 0.03;
     const ITERNUM =3;
     const KSI = 0.01;
 
-    const OUTER = 5*RADIUS;
-    const INNER = 3*RADIUS;
+    // delta_t in paper "Towards more behaviours in crowd simulation" is 0.1
+    // TAU is 0.1 in paper "Realistic following behaviors for crowd simulation"
+    // 0.1/0.1 = 1, so simply use pre_vx and pre_v to record in accordance with 3.1.2 in paper "Towards more behaviours in crowd simulation"
+    // TAU and C are tied together, they are 0.1 and 1.3 respectively
+    const timestep = 0.1;
+    let TAU = 0.2;
+    // use for getting the velocity in n frames before current frame
+    let preFrame = TAU / timestep;
+    let C = 5;
+    let GAMMA = -0.514;
+    // agent walking direction in original paper is x
+    // in our case is -x, so need a correction factor
+    let WALKINGDIR = -1;
 
-    const ahead1 = OUTER - RADIUS;
-    const ahead2 = INNER - RADIUS;
 
-    let C = getConstant();
-    let TAU = getTau();
-    let GAMMA = getGamma();
+    // "Towards more behaviours in crowd simulation"
+    // The condition activates the following mechanism
+    // 4.1 Following Behavior Result
+    const EPSILON_a_f = Math.PI / 6;
+    // original setting is 1.5 respect to 0.3 radius. We scale this threshold by (RADIUS / 0.3)
+    // const EPSILON_p_x = 1.5 * (RADIUS / 0.3);
+    const EPSILON_p_x = 2.8 * (RADIUS / 0.3);
 
+    // refer to r1 + r2 in paper, which is the radius addition from two agents
+    const EPSILON_y = 2 * RADIUS
 
+    // make sure the looping starts from the head of agent flow, otherwise the following model won't work properly
+    // sceneEntities.sort((a, b) => a.x - b.x);
+
+    // default action if no constrain exists
     agentVelocityPlannerV5();
 
-    // // find leader
-    // sceneEntities.forEach(function (item){
-    //     item.waitAgent = pickAgent(item, sceneEntities);
-    // })
-    //
-    //
-    // sceneEntities.forEach(function (item){
-    //     item.prev_vx = item.vx;
-    //     item.prev_vy = item.vy;
-    //     item.prev_vz = item.vz;
-    //
-    //     // get relative speed
-    //     let relative_vx = getRelativeSpeed(item);
-    //     let relative_vz = 0; // according to the video, there is no vz
-    //
-    //     let ax = C * relative_vx * Math.pow(getDensity(item), GAMMA);
-    //     let az = C * relative_vz * Math.pow(getDensity(item), GAMMA);
-    //
-    //     item.vx = item.prev_vx + ax * timestep;
-    //     item.vz = item.prev_vz + az * timestep;
-    //
-    //
-    // });
-    //
 
+
+    // record the -tau agent speed
     sceneEntities.forEach(function (item) {
-        //
-        // let a1 = {x:item.x + -1 * ahead1, z:item.z + 0 * ahead1 };
-        // let a2 = {x:item.x + -1 * ahead2, z:item.z + 0 * ahead2 };
-        //
-        let closet = pickAgent(item, sceneEntities);
 
-        let averageFlowDir = calculateAlignmentSteering(item, item.cachedAgents);
-
-        let velocity = item.scenarioVec;
-        const dir_x = velocity.x + averageFlowDir.x;
-        const dir_z = velocity.z + averageFlowDir.z;
-
-        let newV = item.v_pref;
-
-        if(closet){
-            let dist = distance(closet.x, closet.z, item.x, item.z);
-
-            let arriveV = kernel2(dist, item.v_pref, INNER, OUTER);
-
-            newV -= arriveV;
-
-
-
+        if(item.cachedVelocity.length >= preFrame){
+            item.reqPreVel = item.cachedVelocity.shift();
         }
 
-        item.vx = newV * dir_x;
-        item.vz = newV * dir_z;
+        item.cachedVelocity.push(item.vx)
+
+        item.prev_vx = item.vx;
+        item.prev_vz = item.vz;
+    });
+
+    sceneEntities.forEach(function (item){
+
+        // get relative speed
+        let a = realisticFollowing(item, sceneEntities);
+        // debug purpose
+        let lead = item.waitAgent;
+
+        item.vx = item.prev_vx + a * timestep;
+        // one-d condition does not have a on z-axis
+        item.vz = item.prev_vz;
 
 
     });
+
+
 
     sceneEntities.forEach(function (item) {
 
@@ -447,7 +432,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
         item.px = item.x + timestep*item.vx;
         item.pz = item.z + timestep*item.vz;
-        item.py = item.y + timestep*item.vy;
+
 
     });
 
@@ -489,46 +474,62 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         pbdIters+=1;
     }
 
-
+    // update and for recording purpose
     sceneEntities.forEach(function (item) {
 
         item.vx = (item.px-item.x)/timestep;
         item.vz = (item.pz-item.z)/timestep;
-        item.vy = (item.py-item.y)/timestep;
+
 
         item.vm = Math.sqrt(item.vx * item.vx + item.vz * item.vz);
-        item.x = item.px;
-        item.z = item.pz;
-        item.y = item.py;
 
-        if(item.x < -world.x/2)
-        {
-            item.x = -world.x/2;
-        }
-        else if(item.x > world.x/2)
-        {
-            item.x = world.x/2;
+        if (item.x <= -69  ) {
+        // if (item.index ===0  ) {
+
+            if(customParam.stop){
+
+                if(item.move){
+                    item.backupVm = item.vm;
+                    item.vm = 0;
+                    item.move = false;
+                }else {
+                    item.vm = 0;
+                    item.move = false;
+
+                }
+
+
+            }else {
+
+                if(!item.move){
+                    // item.vm = item.backupVm;
+                    item.vm = realisticFollowing(item,sceneEntities) * timestep;
+                    item.px = item.x + timestep*item.vm;
+                    // item.pz = item.z + timestep*item.vz;
+
+                    item.move = true;
+                }
+
+                item.x = item.px;
+                item.z = item.pz;
+
+
+            }
+
+        }else {
+            item.x = item.px;
+            item.z = item.pz;
+
         }
 
 
-        if(item.z < -world.z/2)
-        {
-            item.z = -world.z/2;
-        }
-        else if(item.z > world.z/2)
-        {
-            item.z= world.z/2;
-        }
 
-        // if(item.group_id === 1) {
-        //
-        //     if (item.x <= -69) {
-        //         item.x = world.x / 2;
-        //         item.z = item.sz;
-        //     }
-        // }
+
+
 
     });
 
+
+    customParam.globalTimestamp += 1;
 }
 
