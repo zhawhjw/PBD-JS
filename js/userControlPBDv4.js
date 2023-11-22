@@ -177,22 +177,6 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return v;
     }
 
-    function kernel2(dist, yMax, minBuffer, maxBuffer){
-        let v;
-
-        if (dist < minBuffer){
-            v = yMax;
-        }else if(dist > maxBuffer){
-            v = 0;
-        }else {
-            let slope = - yMax / (maxBuffer - minBuffer);
-            let bias = - slope * maxBuffer;
-
-            v = slope * dist + bias;
-        }
-
-        return v;
-    }
 
     function calculateAlignmentSteering(agent, agentGroups) {
 
@@ -221,6 +205,20 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         return averageHeading;
     }
 
+    function kernelv3(agent, inputDist){
+        let deltaDist = 0;
+        if (inputDist <=agent.personalDistance){
+            deltaDist = agent.personalDistance - inputDist;
+        }else{
+
+
+
+
+        }
+
+        return deltaDist;
+
+    }
 
     // =======================//
     // For Realistic Following//
@@ -280,10 +278,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             //  a_v < e_a_f
             let condition1 = angleBtwnVecs(followerVec, leadingVec, EPSILON_a_f);
             // 0 < delta_p_x < e_p_x. This should be a distance vector (has direction)
-            let condition2 = (delta_p_x > 0 ) && (delta_p_x < EPSILON_p_x);
-            // if(lookHeader){
-            //     condition2 = (delta_p_x > 0 );
-            // }
+            // let condition2 = (delta_p_x > 0 ) && (delta_p_x < EPSILON_p_x);
+            let condition2 = (delta_p_x > 0 );
 
 
             // delta_p_y < r1 + r2
@@ -429,62 +425,60 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
 
 
-    // record the -tau agent speed
+    // calculate vx
     sceneEntities.forEach(function (item) {
-
-        if(item.cachedVelocity.length >= preFrame){
-            item.reqPreVel = item.cachedVelocity.shift();
-        }else{
-            item.reqPreVel = item.vx;
-        }
-
-        item.cachedVelocity.push(item.vx)
 
         item.prev_vx = item.vx;
         item.prev_vz = item.vz;
     });
 
-    sceneEntities.forEach(function (item){
 
-        // get relative speed
-        let a = realisticFollowing(item, sceneEntities);
-        // debug purpose
-        let lead = item.waitAgent;
-
-        if(item.header && !item.move){
-            item.vx = item.prev_vx;
-        }else {
-            item.vx = item.prev_vx + a * timestep;
-
-        }
-
-
-        if(Math.abs(item.vx) > item.v_pref){
-            // console.log("EXCCED");
-            item.vx = -item.v_pref;
-        }
-
-
-
-        // one-d condition does not have a on z-axis
-        item.vz = item.prev_vz;
-
-    });
-
-
-
+    // move to px
     sceneEntities.forEach(function (item) {
-
-        // need to be revised
-        // item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
-        // item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
 
         item.px = item.x + timestep*item.vx;
         item.pz = item.z + timestep*item.vz;
+    });
+
+    //
+    //position correction
+    sceneEntities.forEach(function (item) {
+
+        let potentialLeaders = findPotentialLeaders(item, sceneEntities);
+        let followingConditions = potentialLeaders.length > 0;
+
+        if(followingConditions){
+
+            //   find nearest
+            let leader = null;
+            // This will be used to calculate acceleration
+            let minimum_delta_p_x = Number.MAX_VALUE;
+            for (let i =0; i<potentialLeaders.length;i++){
+                let delta_p_x = WALKINGDIR * (potentialLeaders[i].x - item.x); // order
+                if(delta_p_x<minimum_delta_p_x){
+                    minimum_delta_p_x = delta_p_x;
+                    leader = potentialLeaders[i];
+                }
+            }
+
+            item.waitAgent = leader;
+
+            // be aware of direction
+            let dist = item.px - leader.px;
+
+            let delta_p = kernelv3(item, dist);
+
+
+
+            item.px += delta_p;
+            item.pz += 0;
+
+
+        }
+
 
 
     });
-
 
 
     let pbdIters = 0;
@@ -531,30 +525,6 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
 
         item.vm = Math.sqrt(item.vx * item.vx + item.vz * item.vz);
-
-        // if(customParam.stop){
-        //
-        //     if(item.header){
-        //         let acceleration =item.v_pref / timestep * 0.1;
-        //         item.vm = item.vm  - 0.008 * item.v_pref ;
-        //         // console.log(item.vm);
-        //         if (item.vm <=0){
-        //             item.vm = 0;
-        //         }
-        //         item.px = item.x + timestep*item.vm * WALKINGDIR;
-        //         item.move = false;
-        //     }
-        //
-        // }else {
-        //
-        //     if(!item.move){
-        //         item.vm = realisticFollowing(item,sceneEntities) * timestep;
-        //         item.px = item.x + timestep*item.vm;
-        //         item.move = true;
-        //     }
-        //
-        // }
-
 
 
         item.x = item.px;

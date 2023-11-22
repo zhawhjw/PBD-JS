@@ -968,6 +968,7 @@ function init() {
                 reqPreVel:null,
                 header: false,
                 obstacle: obs,
+                personalDistance: 2.5,
 
             });
             i += 1;
