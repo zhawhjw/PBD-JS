@@ -278,8 +278,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
             //  a_v < e_a_f
             let condition1 = angleBtwnVecs(followerVec, leadingVec, EPSILON_a_f);
             // 0 < delta_p_x < e_p_x. This should be a distance vector (has direction)
-            // let condition2 = (delta_p_x > 0 ) && (delta_p_x < EPSILON_p_x);
-            let condition2 = (delta_p_x > 0 );
+            let condition2 = (delta_p_x > 0 ) && (delta_p_x < EPSILON_p_x);
+            // let condition2 = (delta_p_x > 0 );
 
 
             // delta_p_y < r1 + r2
@@ -371,6 +371,9 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     function filterObstacles(array) {
         return array.filter(item => item.obstacle === true);
     }
+
+
+
     /*  -----------------------  */
 
 
@@ -385,7 +388,7 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
     // 0.1/0.1 = 1, so simply use pre_vx and pre_v to record in accordance with 3.1.2 in paper "Towards more behaviours in crowd simulation"
     // TAU and C are tied together, they are 0.1 and 1.3 respectively
     const timestep = 0.05;
-    let TAU = 0.7;
+    let TAU = 0.6;
     // use for getting the velocity in n frames before current frame
     let preFrame = TAU / timestep;
     let C = 5;
@@ -425,60 +428,55 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
 
 
-    // calculate vx
+    // record the -tau agent speed
     sceneEntities.forEach(function (item) {
+
+        if(item.cachedVelocity.length >= preFrame){
+            item.reqPreVel = item.cachedVelocity.shift();
+        }else{
+            item.reqPreVel = item.vx;
+        }
+
+        item.cachedVelocity.push(item.vx)
 
         item.prev_vx = item.vx;
         item.prev_vz = item.vz;
     });
 
-
-    // move to px
     sceneEntities.forEach(function (item) {
+
+        // need to be revised
+        // item.vx = KSI* item.vx + (1-KSI) * item.prev_vx
+        // item.vz = KSI* item.vz + (1-KSI) * item.prev_vz
 
         item.px = item.x + timestep*item.vx;
         item.pz = item.z + timestep*item.vz;
+        item.rf = item.px;
+
     });
 
-    //
-    //position correction
-    sceneEntities.forEach(function (item) {
+    sceneEntities.forEach(function (item){
 
-        let potentialLeaders = findPotentialLeaders(item, sceneEntities);
-        let followingConditions = potentialLeaders.length > 0;
+        // get relative speed
+        let a = realisticFollowing(item, sceneEntities);
+        // debug purpose
+        let lead = item.waitAgent;
 
-        if(followingConditions){
+        if(item.header && !item.move){
+            // do nothing
+        }else {
+            item.px +=  a * timestep * timestep;
 
-            //   find nearest
-            let leader = null;
-            // This will be used to calculate acceleration
-            let minimum_delta_p_x = Number.MAX_VALUE;
-            for (let i =0; i<potentialLeaders.length;i++){
-                let delta_p_x = WALKINGDIR * (potentialLeaders[i].x - item.x); // order
-                if(delta_p_x<minimum_delta_p_x){
-                    minimum_delta_p_x = delta_p_x;
-                    leader = potentialLeaders[i];
-                }
-            }
-
-            item.waitAgent = leader;
-
-            // be aware of direction
-            let dist = item.px - leader.px;
-
-            let delta_p = kernelv3(item, dist);
-
-
-
-            item.px += delta_p;
-            item.pz += 0;
-
-
+            console.log("RF: "+item.rf+" ||| PBD: "+item.px);
         }
 
 
 
+        // one-d condition does not have a on z-axis
+        item.px += 0;
+
     });
+
 
 
     let pbdIters = 0;
@@ -547,5 +545,6 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
 
     customParam.globalTimestamp += 1;
+
 }
 

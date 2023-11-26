@@ -968,6 +968,8 @@ function init() {
                 reqPreVel:null,
                 header: false,
                 obstacle: obs,
+                pbd:0,
+                rf:0,
 
             });
             i += 1;
@@ -1090,7 +1092,13 @@ function init() {
             let bestDistance = 0;
 
             for (let j = 0; j < k; j++) {
-                const candidate = [Math.random() * width, Math.random() * height];
+                let a=Math.random();
+                let b=Math.random();
+                const candidate = [a * width, b * height];
+
+
+                // const candidate = [0.5 * width, 0.7 * height];
+
                 let minDistance = Infinity;
 
                 for (const sample of samples) {

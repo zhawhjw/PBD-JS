@@ -444,12 +444,16 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         item.prev_vz = item.vz;
     });
 
+
     sceneEntities.forEach(function (item){
 
+        let pbd = item.x + timestep*item.vx;
         // get relative speed
         let a = realisticFollowing(item, sceneEntities);
         // debug purpose
         let lead = item.waitAgent;
+        pbd+= a * timestep * timestep;
+        item.pbd = pbd;
 
         if(item.header && !item.move){
             item.vx = item.prev_vx;
@@ -459,10 +463,9 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
         }
 
 
-        if(Math.abs(item.vx) > item.v_pref){
-            // console.log("EXCCED");
-            item.vx = -item.v_pref;
-        }
+        // if(Math.abs(item.vx) > item.v_pref){
+        //     item.vx = -item.v_pref;
+        // }
 
 
 
@@ -481,6 +484,8 @@ export function step(RADIUS, sceneEntities, obstacleEntities, world, WORLDUNIT, 
 
         item.px = item.x + timestep*item.vx;
         item.pz = item.z + timestep*item.vz;
+
+        console.log("RF: "+item.px+" ||| PBD: "+item.pbd);
 
 
     });
